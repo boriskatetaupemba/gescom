@@ -2,9 +2,8 @@
 #  .gitignore — Dolibarr (gescom) — racine = htdocs
 # ============================================================
 
-# --- Configuration sensible (identifiants BDD, clés, secrets) ---
-/conf/conf.php
-/conf/conf.php.old
+# NB : conf/conf.php et conf/conf.php.old sont suivis volontairement (dépôt privé).
+#      ATTENTION : ils contiennent les identifiants de la base de données.
 
 # --- Données & documents générés par l'application ---
 /documents/
