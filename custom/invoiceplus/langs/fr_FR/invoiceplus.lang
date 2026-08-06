@@ -1,0 +1,19 @@
+# InvoicePlus - Français
+ModuleInvoicePlusName=Invoice Plus
+ModuleInvoicePlusDesc=Services REST extensibles pour les factures clients
+ModuleInvoicePlusDescLong=InvoicePlus ajoute des services sécurisés et compatibles avec les factures clients natives sans modifier les fichiers du cœur Dolibarr.
+InvoicePlus=Invoice Plus
+InvoicePlusSetup=Configuration d'Invoice Plus
+InvoicePlusSetupDesc=Configurez l'endpoint des factures par entrepôt. Les changements s'appliquent à l'entité courante.
+InvoicePlusAbout=À propos d'Invoice Plus
+InvoicePlusApiEndpoint=Endpoint REST
+InvoicePlusAboutArchitecture=Les réponses sont construites par l'API native Invoices installée ; InvoicePlus sélectionne uniquement les factures et applique les filtres de réponse optionnels.
+InvoicePlusInvalidMaxLimit=La limite maximale de l'API doit être comprise entre 1 et 10000.
+SetupINVOICEPLUS_API_ENABLED=Activer l'endpoint REST
+SetupINVOICEPLUS_API_ENABLEDHelp=Lorsque cette option est désactivée, les appels REST InvoicePlus retournent HTTP 403.
+SetupINVOICEPLUS_MAX_API_LIMIT=Taille maximale d'une page API
+SetupINVOICEPLUS_MAX_API_LIMITHelp=Limite la valeur effective du paramètre limit. Une valeur demandée égale à zéro utilise également ce maximum.
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATA=Ajouter les métadonnées du filtre d'entrepôt
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATAHelp=Ajoute invoiceplus_warehouse_filter à chaque réponse ; cette propriété n'est jamais enregistrée.
+SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Conserver les données InvoiceClosure
+SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Conserve exactement la propriété invoiceclosure ajoutée par l'API native lorsque InvoiceClosure est actif et que l'utilisateur possède le droit de lecture.
