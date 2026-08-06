@@ -1871,12 +1871,20 @@ class Invoices extends DolibarrApi
 	/**
 	 * Clean sensible object datas
 	 *
+	 * When the external module InvoiceClosure is enabled, every customer
+	 * invoice returned by this API is enriched with an "invoiceclosure"
+	 * property holding the business closure status (see _getInvoiceClosureData).
+	 *
 	 * @param   Object  $object     Object to clean
 	 * @return  Object              Object with cleaned properties
 	 */
 	protected function _cleanObjectDatas($object)
 	{
 		// phpcs:enable
+		// Keep discriminating values before the generic cleaning removes them
+		$iscustomerinvoice = (isset($object->element) && $object->element === 'facture');
+		$invoiceid = (empty($object->id) ? 0 : (int) $object->id);
+
 		$object = parent::_cleanObjectDatas($object);
 
 		unset($object->note);
@@ -1887,7 +1895,95 @@ class Invoices extends DolibarrApi
 		unset($object->barcode_type_coder);
 		unset($object->canvas);
 
+		// Module InvoiceClosure: expose the business closure status of customer invoices
+		if ($iscustomerinvoice && $invoiceid > 0) {
+			$closuredata = $this->_getInvoiceClosureData($invoiceid);
+			if ($closuredata !== null) {
+				$object->invoiceclosure = $closuredata;
+			}
+		}
+
 		return $object;
+	}
+
+	/**
+	 * Build the business closure information of a customer invoice
+	 * (external module InvoiceClosure).
+	 *
+	 * Returns null (property not added) when the module is disabled, when the
+	 * API user has no permission to read closure information, or on error.
+	 *
+	 * @param	int			$invoiceid	Invoice id
+	 * @return	array|null				Closure data, or null when not applicable
+	 */
+	private function _getInvoiceClosureData($invoiceid)
+	{
+		global $langs;
+
+		if (!isModEnabled('invoiceclosure')) {
+			return null;
+		}
+		if (empty(DolibarrApiAccess::$user) || !DolibarrApiAccess::$user->hasRight('invoiceclosure', 'read')) {
+			return null;
+		}
+		if (!dol_include_once('/invoiceclosure/class/invoiceclosure.class.php')) {
+			return null;
+		}
+
+		$closure = new InvoiceClosure($this->db);
+		$found = $closure->fetchByInvoice($invoiceid);
+		if ($found < 0) {
+			dol_syslog(get_class($this)."::_getInvoiceClosureData ".$closure->error, LOG_ERR);
+			return null;
+		}
+
+		$langs->loadLangs(array('invoiceclosure@invoiceclosure'));
+
+		$isclosed = ($found > 0 && (int) $closure->closure_status === InvoiceClosure::STATUS_CLOSED);
+		$businessstatuscode = 'not_closed';
+		if ($isclosed) {
+			$businessstatuscode = 'closed';
+		} elseif ($found > 0 && !empty($closure->date_reopen)) {
+			$businessstatuscode = 'reopened';
+		}
+
+		$data = array(
+			'business_status' => $isclosed ? 1 : 0,
+			'business_status_code' => $businessstatuscode,
+			'business_status_label' => $isclosed ? $langs->trans('InvoiceClosed') : $langs->trans('InvoiceNotClosed'),
+			'locked' => ($isclosed && getDolGlobalInt('INVOICECLOSURE_LOCK_CLOSED_INVOICES')) ? 1 : 0,
+			'closed_at' => null,
+			'closed_at_iso' => null,
+			'closed_by' => null,
+			'closure_note' => '',
+			'reopened_at' => null,
+			'reopened_at_iso' => null,
+			'reopened_by' => null,
+			'reopen_note' => '',
+		);
+
+		if ($found > 0) {
+			if (!empty($closure->date_closure)) {
+				$data['closed_at'] = (int) $closure->date_closure;
+				$data['closed_at_iso'] = dol_print_date($closure->date_closure, 'dayhourrfc');
+				$data['closed_by'] = array(
+					'id' => (int) $closure->fk_user_closure,
+					'login' => $closure->closure_login,
+				);
+				$data['closure_note'] = $closure->closure_note;
+			}
+			if (!empty($closure->date_reopen)) {
+				$data['reopened_at'] = (int) $closure->date_reopen;
+				$data['reopened_at_iso'] = dol_print_date($closure->date_reopen, 'dayhourrfc');
+				$data['reopened_by'] = array(
+					'id' => (int) $closure->fk_user_reopen,
+					'login' => $closure->reopen_login,
+				);
+				$data['reopen_note'] = $closure->reopen_note;
+			}
+		}
+
+		return $data;
 	}
 
 	/**
