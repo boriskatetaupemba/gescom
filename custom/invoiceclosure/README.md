@@ -174,6 +174,38 @@ curl -X GET -H "DOLAPIKEY: VOTRE_CLE_API" \
 
 Les chemins exacts sont vérifiables dans l'explorateur REST après installation.
 
+### Intégration avec l'API native `/invoices` (personnalisation de ce fork)
+
+Lorsque le module est **activé** et que l'utilisateur API possède le droit
+*Lire les informations de clôture*, toutes les routes natives qui retournent
+des factures clients (`GET /invoices`, `GET /invoices/{id}`,
+`GET /invoices/ref/{ref}`, `GET /invoices/ref_ext/{ref_ext}`,
+`GET /invoices/byaccounts`, ainsi que les retours de `PUT /invoices/{id}`,
+`validate`, `settopaid`, `settounpaid`, `settodraft`, `createfromorder`,
+`createfromcontract`, …) incluent une propriété supplémentaire :
+
+```json
+"invoiceclosure": {
+  "business_status": 1,
+  "business_status_code": "closed",
+  "business_status_label": "Clôturée",
+  "locked": 1,
+  "closed_at": 1786012560,
+  "closed_at_iso": "2026-08-06T14:36:00+02:00",
+  "closed_by": { "id": 15, "login": "bkateta" },
+  "closure_note": "Clôture après vérification de la caisse",
+  "reopened_at": null,
+  "reopened_at_iso": null,
+  "reopened_by": null,
+  "reopen_note": ""
+}
+```
+
+Implémentation : enrichissement centralisé dans l'override
+`Invoices::_cleanObjectDatas()` de `compta/facture/class/api_invoices.class.php`
+(fichier déjà personnalisé sur cette instance — voir §7). Module désactivé ou
+droit absent → la propriété est simplement omise, comportement natif inchangé.
+
 ---
 
 ## 5. Verrouillage des factures clôturées
@@ -230,7 +262,14 @@ forcée est tracée en `LOG_WARNING` dans le syslog Dolibarr.
 - `sql/data.sql` absent : aucune donnée initiale à insérer (fichier de données
   vide exclu volontairement, conformément au fonctionnement de `_load_tables()`).
 
-## 7. Fichiers du cœur inspectés (aucun modifié)
+## 7. Fichiers du cœur inspectés (aucun modifié par le module)
+
+> Note propre à ce fork : `compta/facture/class/api_invoices.class.php` était
+> **déjà personnalisé** sur cette instance (route `byaccounts`). L'intégration
+> « statut de clôture dans l'API native » (§4) y a été ajoutée dans la même
+> logique. Le module lui-même reste 100 % autonome : si ce fichier est écrasé
+> par une mise à jour Dolibarr, seul l'enrichissement de l'API native disparaît,
+> le module et son API `/invoiceclosureapi` continuent de fonctionner.
 
 - `filefunc.inc.php` (version 20.0.4), `conf/conf.php` (SGBD mysqli, préfixe)
 - `compta/facture/card.php` (contexts/hook `invoicecard`, actions, boutons, formConfirm)
