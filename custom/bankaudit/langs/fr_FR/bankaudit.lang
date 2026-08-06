@@ -1,0 +1,280 @@
+# Dolibarr language file - fr_FR - bankaudit
+#
+# Module
+Module4900000Name=Audit Banques & Caisses
+Module4900000Desc=Audit, traçabilité, synchronisation des virements, tableau de bord de trésorerie et détection d'anomalies pour le module Banques & Caisses
+ModuleBankAuditName=Audit Banques & Caisses
+ModuleBankAuditDesc=Audit, traçabilité, synchronisation des virements, tableau de bord de trésorerie et détection d'anomalies
+
+# Permissions
+Permission4900001=Consulter l'audit et le tableau de bord de trésorerie
+Permission4900002=Configurer le module (seuils, règles d'anomalies)
+Permission4900003=Consulter les rapports financiers
+Permission4900004=Exporter les rapports financiers (PDF/Excel/CSV)
+Permission4900005=Consulter les rapports d'audit
+
+# Menus
+BankAuditMenu=Audit Banques
+TreasuryDashboard=Tableau de bord trésorerie
+RateHistoryMenu=Historique des taux
+AnomaliesMenu=Anomalies détectées
+BankReportsMenu=Rapports financiers
+BankAuditSetup=Configuration Audit Banques
+
+# Tracking / Suivi (Spec 1)
+AuditTrailTitle=Suivi des modifications
+AuditDateTime=Date / heure
+AuditUser=Utilisateur
+AuditAction=Action
+AuditField=Champ modifié
+AuditOldValue=Ancienne valeur
+AuditNewValue=Nouvelle valeur
+AuditActionCREATE=Création
+AuditActionUPDATE=Modification
+AuditActionDELETE=Suppression
+NoAuditRecordFound=Aucun mouvement d'audit enregistré
+AuditContextAutoSync=Synchronisation automatique de l'écriture liée
+
+# Transfer conversion (Spec 3) & balance guard (Spec 2 / P2)
+AutoConvertedAmount=Montant converti automatiquement
+ConversionRateNotFound=Taux de conversion introuvable pour cette paire de devises
+ConversionRateOutdated=Attention : le taux de conversion a plus de 7 jours
+InsufficientBalance=Solde insuffisant
+AvailableBalance=Solde disponible
+BalanceAfterTransfer=Solde après virement
+BalanceGuardBlocked=Virement bloqué : solde insuffisant sur le compte source
+
+# Treasury dashboard (P1)
+TreasuryDashboardTitle=Tableau de bord de la trésorerie
+RefreshedOn=Actualisé le
+TotalConsolidated=Total consolidé
+NativeBalance=Solde natif
+EquivalentMainCurrency=Équivalent %s
+Trend7Days=Tendance (7 j)
+NbCashAccounts=Caisses
+NbBankAccounts=Comptes bancaires
+TreasuryAlerts=Alertes
+AccountBelowThreshold=%s sous le seuil (%s)
+RefreshNow=Actualiser
+NoOpenAccount=Aucun compte ouvert
+RateMissingForCurrency=Taux manquant pour %s
+
+# Rate history (P4)
+RateHistoryTitle=Historique des taux de change
+CurrencyPair=Paire de devises
+OldRate=Ancien taux
+NewRate=Nouveau taux
+RateVariation=Variation
+RateAlertFlag=Alerte
+RateAlertThresholdPct=Seuil d'alerte de variation (%)
+ExportCsv=Exporter en CSV
+RateEvolutionChart=Évolution sur 90 jours
+AllPairs=Toutes les paires
+NoRateHistory=Aucun historique de taux
+
+# Anomalies (P12)
+AnomaliesTitle=Anomalies détectées
+NewAnomaliesCount=%s nouvelle(s)
+AnomalyRule=Règle
+AnomalyDetail=Détail
+AnomalyAcknowledge=Acquitter
+AnomalyMarkFalsePositive=Faux positif
+AnomalyViewLine=Voir l'écriture
+AnomalyStatusNew=Nouvelle
+AnomalyStatusAck=Acquittée
+AnomalyStatusFalsePositive=Faux positif
+AnomalyAllStatus=Toutes
+NoAnomalyDetected=Aucune anomalie détectée
+AnomalySeverityInfo=Information
+AnomalySeverityWarning=Avertissement
+AnomalySeverityCritical=Critique
+# Rule labels
+RuleR01=Doublon probable
+RuleR02=Montant inhabituel
+RuleR03=Écriture à date ancienne
+RuleR04=Taux de change anormal
+RuleR05=Solde négatif
+RuleR06=Compte inactif mouvementé
+RuleR01Detail=Écriture identique (montant et date proches) déjà présente sur le compte
+RuleR02Detail=Montant supérieur à %s fois la moyenne des 30 derniers jours
+RuleR03Detail=Date d'opération antérieure de plus de %s jours
+RuleR04Detail=Variation du taux supérieure au seuil configuré
+RuleR05Detail=Solde du compte sous le seuil minimum configuré
+RuleR06Detail=Mouvement sur un compte sans activité depuis plus de %s jours
+
+# Reports (P9)
+BankReportsTitle=Rapports financiers
+ReportType=Type de rapport
+ReportCashFlow=Flux de trésorerie
+ReportByCategory=Analyse par catégorie
+ReportExchangeGainLoss=Gain / perte de change
+ReportBankJournal=Journal bancaire
+ReportConsolidated=Récapitulatif consolidé
+ReportDateStart=Du
+ReportDateEnd=Au
+GenerateReport=Générer
+TotalIn=Total entrées
+TotalOut=Total sorties
+NetBalance=Solde net
+ReportPeriod=Période
+NbOperations=Nb opérations
+AverageAmount=Montant moyen
+ExportToExcel=Exporter (Excel/CSV)
+ExportToPdf=Exporter (PDF)
+NoDataForPeriod=Aucune donnée pour la période sélectionnée
+
+# Setup (admin)
+BankAuditSetupTitle=Configuration - Audit Banques & Caisses
+SettingsGeneral=Paramètres généraux
+RateAlertThresholdDesc=Variation de taux (%) au-delà de laquelle une alerte est générée
+AnomalyAvgFactorDesc=Facteur (x moyenne) au-delà duquel un montant est jugé inhabituel (R02)
+OldDateDaysDesc=Nombre de jours au-delà duquel une date d'opération est jugée ancienne (R03)
+InactiveDaysDesc=Nombre de jours d'inactivité d'un compte (R06)
+AccountThresholds=Seuils par compte (solde minimum)
+MinBalance=Solde minimum
+ThresholdCurrency=Devise du seuil
+SaveSetup=Enregistrer
+SetupSaved=Configuration enregistrée
+AnomalyRulesConfig=Règles de détection d'anomalies
+RuleActive=Active
+RuleThreshold=Seuil
+RuleUnit=Unité
+RuleScope=Compte (vide = tous)
+EmptyForNoBlocking=Vide = pas de blocage
+BalanceGuardDesc=Activer le contrôle du solde minimum avant un virement interne
+
+# Bank line "Suivi" tab + linked transfer line panel
+BankAuditLineHistoryTab=Suivi
+LinkedTransferLine=Écriture liée (virement)
+LinkedTransferLineReadonly=Aperçu en lecture seule de l'écriture liée
+ViewLinkedLine=Voir l'écriture liée
+LinkedLineUpdateConfirm=Cette modification sera aussi répercutée sur l'écriture liée du compte « %s ». Continuer ?
+LinkedLineUpdateTitle=Modification d'une écriture liée
+AccountLabel=Compte
+DateOperationShort=Date opération
+DateValueShort=Date valeur
+RemoveLine=Supprimer la ligne
+AutoComputedField=Calculé automatiquement (non modifiable)
+# Link a bank account / cash register to a warehouse
+BankAuditLinkedWarehouse=Entrepôt / Magasin lié
+BankAuditLinkedWarehouseHelp=Associez de façon optionnelle ce compte ou cette caisse à un entrepôt/magasin. Un entrepôt/magasin peut être lié à plusieurs comptes/caisses.
+# Reverse view: linked accounts shown on the warehouse card
+BankAuditWarehouseAccountsTitle=Comptes / Caisses rattachés
+BankAuditNoLinkedAccount=Aucun compte ou caisse n'est rattaché à cet entrepôt/magasin.
+
+# Global audit log viewer (req 4)
+BankAuditLogMenu=Journal d'audit
+BankAuditLogTitle=Journal d'audit des banques et caisses
+BankAuditLogDesc=Trace complète des créations, modifications et suppressions sur les comptes et les écritures (les suppressions y restent consultables).
+BankAuditActionCreate=Création
+BankAuditActionUpdate=Modification
+BankAuditActionDelete=Suppression
+BankAuditActionRestore=Restauration
+BankAuditAutoSync=Auto
+BankAuditAutoSyncHelp=Modification issue de la synchronisation automatique de l'écriture liée
+BankAuditManual=Manuel
+BankAuditNoHistory=Aucun mouvement enregistré
+# Restore of a deleted line
+BankAuditRestoreLine=Restaurer
+BankAuditRestored=Restaurée
+BankAuditRestoreDone=Écriture restaurée (nouvel identifiant #%s)
+BankAuditRestoreDoneLinked=Écriture liée restaurée (nouvel identifiant #%s)
+BankAuditRestoreInsufficientData=Données insuffisantes pour restaurer cette écriture (suppression antérieure à la mise à jour du module)
+BankAuditRestoreNotFound=Entrée de suppression introuvable
+BankAuditRestoreAlreadyRestored=Cette écriture a déjà été restaurée
+BankAuditRestoreInsertFailed=Échec de la réinsertion de l'écriture
+# Field labels
+BankAuditFieldFk_account=Compte
+BankAuditFieldFk_type=Type
+BankAuditFieldAmount=Montant
+BankAuditFieldLabel=Libellé
+BankAuditFieldDateo=Date opération
+BankAuditFieldDatev=Date valeur
+BankAuditFieldNum_chq=N° chèque
+BankAuditFieldBanque=Banque
+BankAuditFieldEmetteur=Émetteur
+BankAuditFieldCategories=Catégories
+BankAuditFieldRef=Référence
+BankAuditFieldBank=Banque
+BankAuditFieldNumber=Numéro de compte
+BankAuditFieldCurrency_code=Devise
+BankAuditFieldAccount_number=Compte comptable
+BankAuditFieldClos=Statut
+BankAuditFieldNote_public=Note publique
+
+# Reports center (R01..R15 + value-added)
+ReportInternalTransfers=Virements inter-comptes
+ReportTreasuryByWarehouse=Trésorerie par magasin/entrepôt
+ReportActivityByWarehouse=Activité financière par magasin
+ReportCategoryNvsN1=Comparatif catégories N vs N-1
+ReportReconciliation=Rapprochement bancaire
+ReportCashClosing=Clôture de caisse journalière
+ReportUserActivity=Activité de saisie par utilisateur
+ReportReviewMode=Mode Revue de direction
+ReportDescriptionTitle=Ce rapport vous permet de
+ReportWhatFor=À quoi sert ce rapport ?
+ReportTipR01=Journal détaillé de toutes les écritures d'un compte ou d'une caisse sur la période choisie, avec le solde progressif après chaque opération, les totaux d'entrées/sorties et le taux de rapprochement. Constitue la pièce comptable officielle des mouvements.
+ReportTipR02=Photographie en temps réel de votre trésorerie : solde de chaque compte et caisse, équivalent consolidé en devise principale, tendance sur 7 jours, dernier mouvement et comptes passés sous leur seuil minimum d'alerte.
+ReportTipR03=Évolution des entrées, sorties et du flux net par compte, regroupée par semaine, mois, trimestre, année ou sur la période entière. Aide à repérer les périodes de tension de trésorerie.
+ReportTipR04=Liste de tous les virements internes entre comptes et caisses : montants dans les deux devises, taux de change réellement appliqué et écart avec le taux système, pour détecter les erreurs de saisie.
+ReportTipR05=Estimation des gains et pertes de change réalisés sur les opérations en devises étrangères, en comparant le taux au jour de l'opération avec le taux actuel.
+ReportTipR06=Historique de toutes les modifications de taux de change : ancien et nouveau taux, variation en %, auteur de la modification et source (manuelle ou API).
+ReportTipR07=Trésorerie agrégée par magasin/entrepôt, en additionnant tous les comptes et caisses qui lui sont rattachés, avec l'équivalent consolidé en devise principale. Idéal pour piloter un réseau de points de vente.
+ReportTipR08=Comparaison de l'activité financière (entrées, sorties, flux net, nombre d'opérations) de chaque magasin/entrepôt sur la période, pour repérer les points de vente les plus actifs ou atypiques.
+ReportTipR09=Répartition des entrées et sorties par catégorie comptable (tags), pour identifier vos principales sources de revenus et vos principaux postes de dépenses.
+ReportTipR10=Comparaison des flux par catégorie entre la période courante (N) et la période précédente équivalente (N-1), avec l'écart en valeur et en pourcentage.
+ReportTipR11=Piste d'audit réglementaire : historique complet des créations, modifications et suppressions sur les comptes et écritures, avec l'utilisateur, la date, le champ concerné et les valeurs avant/après.
+ReportTipR12=Anomalies détectées automatiquement (doublons, montants inhabituels, taux anormaux, soldes négatifs…), avec leur niveau de gravité et leur statut de traitement.
+ReportTipR13=Niveau de rapprochement bancaire par compte : nombre d'écritures rapprochées et non rapprochées et taux de rapprochement, pour suivre le pointage avec les relevés.
+ReportTipR14=Document officiel de clôture de caisse pour une journée : mouvements, solde d'ouverture et de clôture, totaux, à imprimer et faire signer par le caissier et le responsable.
+ReportTipR15=Activité de saisie par utilisateur : nombre d'opérations, première et dernière activité, pour mesurer la charge de travail et repérer les comportements inhabituels.
+ReportTipReview=Document consolidé prêt pour la réunion de direction, regroupant en une seule sortie le tableau de bord (R02), les flux par période (R03), la trésorerie par magasin (R07) et le comparatif N/N-1 (R10).
+ReportDailyCashMatrix=Tableau de trésorerie journalier par compte
+ReportTipR16=Matrice journalière de trésorerie : pour chaque jour de la période, les entrées et sorties de chaque compte/caisse, le total des flux converti en devise principale, puis le solde consolidé de fin de journée par devise et son équivalent en devise principale. Une ligne TOTAL cumule les flux de la période et affiche les soldes de clôture.
+BankAuditInflow=Entrée
+BankAuditOutflow=Sortie
+BankAuditRate=Taux
+OpeningBalance=Solde d'ouverture
+ClosingBalance=Solde de clôture
+ReconciliationRate=Taux de rapprochement
+NbLines=Nb lignes
+SelectedPeriod=Période sélectionnée
+PeriodN=Période N
+PeriodN1=Période N-1
+Gap=Écart
+FirstUseDate=Première activité
+LastUseDate=Dernière activité
+FavoriteLabel=Nom du favori
+SaveFavorite=Enregistrer en favori
+Favorites=Favoris
+FavoriteSaved=Favori enregistré
+FavoriteDeleted=Favori supprimé
+CompareWithPreviousPeriod=Comparer à la période précédente
+InterCurrencyOnly=Inter-devises uniquement
+ShowClosedAccounts=Inclure les comptes fermés
+Granularity=Granularité
+GapMinPct=Écart taux min (%)
+ExportHistory=Historique des exports
+OutputFormat=Format de sortie
+ReportAnnotation=Annotation du rapport
+ReportExportedBy=Exporté par
+ReportGeneratedOn=Le
+ReportConfidential=CONFIDENTIEL
+# New entry form + 80mm cash ticket
+BankAuditNewEntry=Nouvelle Écriture
+BankAuditEntryDate=Date écriture
+BankAuditBeneficiary=Bénéficiaire
+BankAuditBeneficiaryHelp=Obligatoire pour une écriture au débit (paiement sortant).
+BankAuditTransactionTags=Tags/catégories des transactions
+BankAuditAmountMustBePositive=Le montant doit être supérieur à 0.
+BankAuditEntrySaved=Écriture #%s enregistrée. Vous pouvez en saisir une autre.
+BankAuditSaveAndPrint=Enregistrer et Imprimer l'écriture
+BankAuditSensChangeTitle=Changement de sens de l'écriture
+BankAuditSensChangeWarning=Vous changez le sens de l'écriture (débit ⟷ crédit). Cela inverse le signe du montant et impacte le solde du compte, les rapprochements et les rapports. Confirmez-vous cette modification ?
+BankAuditTicketTitle=REÇU D'ÉCRITURE
+BankAuditCashier=Caissier
+BankAuditPrintedOn=Imprimé le
+BankAuditPrint=Imprimer
+BankAuditTicketCopies=Nombre de copies du ticket de caisse (80 mm)
+BankAuditTicketCopiesDesc=Nombre d'exemplaires imprimés à chaque « Enregistrer et Imprimer »
+BankAuditDefaultPaymentModeDesc=Mode de règlement pré-sélectionné sur le formulaire « Nouvelle Écriture »

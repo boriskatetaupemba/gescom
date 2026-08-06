@@ -1,0 +1,218 @@
+/* PosNova module - English translation */
+
+/* ----- Module / menus ----- */
+ModulePosNovaDesc=Modern multi-currency point of sale (USD/CDF) for DR Congo
+ModulePosNovaDescLong=PosNova is a complete touch and offline-capable point of sale handling cash sessions, the daily exchange rate, multi-currency payments with change, stock transfers and the accounting separation of POS invoices.
+PosNovaMenu=PosNova
+PosNovaLaunch=Open a register
+PosNovaDailyRate=Daily rate
+PosNovaInvoices=POS invoices
+PosNovaSessions=Cash sessions
+PosNovaConfig=Configuration
+PosNovaSetup=PosNova setup
+PosNovaTerminals=Terminals
+PosNovaTerminal=Terminal
+
+/* ----- Terminal ----- */
+PosNovaVendor=Cashier
+PosNovaWorkingCurrency=Working currency
+PosNovaSession=Session
+PosNovaTickets=tickets
+PosNovaTransfer=Transfer
+PosNovaAlerts=Alerts
+PosNovaOnline=Online
+PosNovaOffline=Offline
+PosNovaLock=Lock
+PosNovaCloseSession=Close register
+PosNovaSearchProduct=Search a product (ref, name, barcode)…
+PosNovaSearchCustomer=Search a customer…
+PosNovaAllCategories=All categories
+PosNovaInStockOnly=In stock only
+PosNovaInvoiceDate=Invoice date
+PosNovaColProduct=Product
+PosNovaColPrice=Price
+PosNovaColQty=Qty
+PosNovaColDiscount=Discount
+PosNovaColTotal=Total
+PosNovaEmptyCart=Empty cart
+PosNovaEmptyCartHint=Click a product to add it to the ticket
+PosNovaSubtotal=Subtotal
+PosNovaTotalDiscount=Total discount
+PosNovaGrandTotal=Amount due
+PosNovaPayCheckout=Checkout
+PosNovaClearCart=Clear cart
+PosNovaAddToCart=Add
+PosNovaWalkInCustomer=Walk-in customer
+PosNovaRateManual=Manual rate
+PosNovaRateSystem=System rate
+
+/* ----- Product info (modal) ----- */
+PosNovaStockByWarehouse=Stock by warehouse
+PosNovaAvailable=Available
+PosNovaReserved=Reserved
+PosNovaPhysical=Physical
+
+/* ----- Payment ----- */
+PosNovaPaymentTitle=Payment
+PosNovaReceived=Received
+PosNovaChange=Change
+PosNovaRemaining=Remaining
+PosNovaConfirmPayment=Confirm payment
+PosNovaMissing=Missing
+PosNovaCovered=Covered
+PosNovaSurplus=Surplus
+PosNovaReference=Reference
+PosNovaMode=Mode
+PosNovaSaleDone=Sale recorded
+PosNovaPriceLocked=Price editing is not allowed
+PosNovaCatalogUpdated=Catalog updated
+
+/* ----- Daily rate ----- */
+PosNovaRateOfTheDay=Rate of the day
+PosNovaSetManualRate=Set manual rate
+PosNovaRateUsdCdf=Rate 1 USD =
+PosNovaSystemReference=System reference
+PosNovaRateHistory=Rate history
+PosNovaNoRateHistory=No rate recorded
+PosNovaRateSaved=Rate saved
+PosNovaSetRate=Set rate
+
+/* ----- Launcher / sessions (pos.php) ----- */
+PosNovaChooseTerminal=Choose a terminal
+PosNovaChooseTerminalHint=Select the register to open
+PosNovaNoTerminal=No terminal available
+PosNovaCreateTerminal=Create a terminal
+PosNovaSessionInProgress=Session in progress
+PosNovaInitialFunds=Initial cash fund
+PosNovaInitialFund=Initial fund
+PosNovaOpenSession=Open session
+PosNovaResumeSession=Resume session
+PosNovaUnlockResume=Unlock and resume
+PosNovaPin=PIN code
+PosNovaLockSession=Register locked
+PosNovaLockSessionHint=Enter your PIN code to resume
+PosNovaSessionLocked=Session locked
+PosNovaExpectedInDrawer=Amount expected in drawer
+PosNovaCountedCash=Counted cash
+PosNovaExpected=Expected
+PosNovaCounted=Counted
+PosNovaDiscrepancy=Discrepancy
+PosNovaConfirmClose=Confirm closing
+PosNovaSessionClosed=Session closed
+PosNovaBackToTerminals=Back to terminals
+PosNovaZReport=Z report
+PosNovaOpenedBy=Opened by
+PosNovaReconnections=Reconnections
+PosNovaCashReconciliation=Cash reconciliation
+PosNovaNoSession=No session
+PosNovaStatusOpen=Open
+PosNovaStatusLocked=Locked
+PosNovaStatusClosed=Closed
+PosNovaStatusCancelled=Cancelled
+
+/* ----- POS invoices ----- */
+PosNovaTicketRef=Ticket ref
+PosNovaBackdated=Backdated
+PosNovaNoInvoice=No invoice
+PosNovaStatusValidated=Validated
+PosNovaStatusCancelPending=Cancellation pending
+PosNovaOrigin=Origin
+PosNovaPointOfSale=Point of sale
+
+/* ----- Setup (setup.php) ----- */
+PosNovaRoundingCdf=CDF rounding
+PosNovaRoundingCdfHelp=Rounding rule applied when converting to Congolese francs.
+PosNovaRounding_DOWN_UNIT=Round down to the unit
+PosNovaRounding_NEAREST_UNIT=Round to the nearest unit
+PosNovaRounding_NEAREST_5=Round to the nearest multiple of 5
+PosNovaCdfCurrencyCode=Local currency ISO code
+PosNovaSessionLifetime=Session lifetime
+PosNovaCatalogPageSize=Catalog page size
+PosNovaPollInterval=Refresh interval
+PosNovaDefaultPrintFormat=Default print format
+PosNovaTransferTimeout=Transfer reservation timeout
+PosNovaCancelEscalation=Cancellation escalation delay
+PosNovaFallbackMulticurrency=Fall back to multicurrency rate
+PosNovaFallbackMulticurrencyHelp=Use the Multicurrency module rate when no daily rate is set.
+
+/* ----- Terminal card (pos_card.php) ----- */
+PosNovaTerminalCreated=Terminal created
+PosNovaConfigureAccountsNow=Now configure the cash accounts
+PosNovaEditTerminal=Edit terminal
+PosNovaDeleteTerminal=Delete terminal
+PosNovaConfirmDeleteTerminal=Do you confirm the deletion of terminal %s?
+PosNovaWarehouseHelp=Warehouse used as stock source and for sales deduction.
+PosNovaWarehouseLockedHasSales=Locked: sales already exist on this warehouse.
+PosNovaDefaultPaymentModeHelp=Payment method preselected on the checkout screen (cash, card, mobile money…). The cashier can change it on each sale.
+PosNovaMaxDiscountHelp=Maximum discount, as a percentage, a cashier may apply on a line or ticket. Set 0 to forbid any discount.
+PosNovaAllowPriceEditHelp=Lets the cashier manually change the unit selling price during a sale. Reserve for trusted staff.
+PosNovaAllowSaleWithoutStockHelp=Allows selling a product even when available stock is zero or insufficient (negative stock allowed). Otherwise the sale is blocked.
+PosNovaTransferEnabledHelp=Shows the stock-transfer button on this register to replenish the warehouse from another depot.
+PosNovaOfflineModeHelp=Lets you keep selling without a connection: tickets are queued and synced when the network returns.
+PosNovaAllowBackdatingHelp=Allows entering an invoice date earlier than today. Enable only for exceptional adjustments.
+PosNovaAutoprintHelp=Automatically prints the receipt as soon as a sale is validated, with no extra click.
+PosNovaPrintFormatHelp=Width of the ticket sent to the printer: 80mm or 58mm for thermal printers, A4 for an office printer.
+PosNovaDefaultCustomerHelp=Generic customer assigned to walk-in sales when no customer is selected (e.g. "Walk-in customer").
+PosNovaLowStockThresholdHelp=Quantity below which a product is flagged as low stock in the register catalog.
+PosNovaTransferTimeoutHelp=Time, in hours, that stock reserved by a transfer stays locked before automatic release.
+PosNovaCancelEscalationHelp=Delay, in minutes, after which an unhandled cancellation request is escalated to a manager.
+PosNovaStatusHelp=An inactive terminal no longer appears in the list of openable registers, without deleting its history.
+PosNovaDefaultPaymentMode=Default payment mode
+PosNovaMaxDiscount=Maximum discount
+PosNovaAllowPriceEdit=Allow price editing
+PosNovaAllowSaleWithoutStock=Allow sale without stock
+PosNovaTransferEnabled=Transfers enabled
+PosNovaOfflineMode=Offline mode
+PosNovaAllowBackdating=Allow backdating
+PosNovaAutoprint=Auto print
+PosNovaPrintFormat=Print format
+PosNovaDefaultCustomer=Default customer
+PosNovaLowStockThreshold=Low stock threshold
+PosNovaCashAccounts=Cash accounts
+PosNovaActive=Active
+PosNovaDefaultAccount=Default account
+PosNovaAccountsHelp=Activate at least one USD account and one CDF account, then designate a default account.
+PosNovaNoWarehouseAccount=No bank/cash account available. Create one in the Bank module.
+PosNovaIncomplete=Incomplete
+PosNovaLinkedWarehouse=Linked warehouse
+PosNovaLinkedWarehouseHelp=Physical warehouse managed by this register.
+
+/* ----- Server errors ----- */
+PosNovaGenericError=An error occurred
+PosNovaErrInvalidRate=Invalid rate
+PosNovaErrCannotLaunch=This register cannot be opened
+PosNovaErrNoRate=No daily rate set
+PosNovaErrWrongPin=Wrong PIN code
+PosNovaErrPinTooShort=PIN code too short
+PosNovaErrPosNotFound=Terminal not found
+PosNovaErrSessionNotOpen=Session not open
+PosNovaErrSessionOtherUser=Session opened by another user
+PosNovaErrSessionAlreadyOpen=A session is already open on this terminal
+PosNovaErrPendingSync=Some offline tickets are not synchronized yet
+PosNovaErrEmptyCart=The cart is empty
+PosNovaErrNoCustomer=No customer selected
+PosNovaErrInvoiceCreate=Invoice creation failed
+PosNovaErrBadLine=Invalid sale line
+PosNovaErrProductNotFound=Product not found
+PosNovaErrProductNotForSale=Product not for sale
+PosNovaErrDiscountOverCap=Discount above the allowed cap
+PosNovaErrInsufficientStock=Insufficient stock
+PosNovaErrAddLine=Failed to add a line
+PosNovaErrPaymentNotCovered=Payment not covered
+PosNovaErrChangeTooHigh=Change greater than the surplus
+PosNovaErrInvoiceValidate=Invoice validation failed
+PosNovaErrStockOut=Stock removal failed
+PosNovaErrStockIn=Stock entry failed
+PosNovaErrNoWarehouse=No warehouse configured
+PosNovaErrNoUsdAccount=No active USD account
+PosNovaErrNoCdfAccount=No active CDF account
+PosNovaErrNoDefaultAccount=No default account designated
+PosNovaErrCannotDeleteHasSales=Cannot delete: sales exist on this terminal
+PosNovaErrNoTransferRight=Missing transfer permission
+PosNovaErrBadTransfer=Invalid transfer
+PosNovaErrSameWarehouse=Source and destination warehouses are identical
+PosNovaErrMotifRequired=Reason required
+PosNovaErrTransferNotPending=Transfer not pending
+PosNovaErrNotInitiator=You are not the initiator of this transfer
+PosNovaOutOfStock=Out of stock
+PosNovaDiscountOverCap=Discount over cap

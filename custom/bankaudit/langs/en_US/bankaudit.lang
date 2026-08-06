@@ -1,0 +1,280 @@
+# Dolibarr language file - en_US - bankaudit
+#
+# Module
+Module4900000Name=Banks & Cash Audit
+Module4900000Desc=Audit, traceability, transfer synchronization, treasury dashboard and anomaly detection for the Banks & Cash module
+ModuleBankAuditName=Banks & Cash Audit
+ModuleBankAuditDesc=Audit, traceability, transfer synchronization, treasury dashboard and anomaly detection
+
+# Permissions
+Permission4900001=Read audit and treasury dashboard
+Permission4900002=Configure module (thresholds, anomaly rules)
+Permission4900003=Read financial reports
+Permission4900004=Export financial reports (PDF/Excel/CSV)
+Permission4900005=Read audit reports
+
+# Menus
+BankAuditMenu=Banks Audit
+TreasuryDashboard=Treasury dashboard
+RateHistoryMenu=Exchange rate history
+AnomaliesMenu=Detected anomalies
+BankReportsMenu=Financial reports
+BankAuditSetup=Banks Audit setup
+
+# Tracking / Suivi (Spec 1)
+AuditTrailTitle=Change tracking
+AuditDateTime=Date / time
+AuditUser=User
+AuditAction=Action
+AuditField=Modified field
+AuditOldValue=Old value
+AuditNewValue=New value
+AuditActionCREATE=Creation
+AuditActionUPDATE=Modification
+AuditActionDELETE=Deletion
+NoAuditRecordFound=No audit record
+AuditContextAutoSync=Automatic synchronization of the linked transaction
+
+# Transfer conversion (Spec 3) & balance guard (Spec 2 / P2)
+AutoConvertedAmount=Automatically converted amount
+ConversionRateNotFound=Conversion rate not found for this currency pair
+ConversionRateOutdated=Warning: the conversion rate is more than 7 days old
+InsufficientBalance=Insufficient balance
+AvailableBalance=Available balance
+BalanceAfterTransfer=Balance after transfer
+BalanceGuardBlocked=Transfer blocked: insufficient balance on source account
+
+# Treasury dashboard (P1)
+TreasuryDashboardTitle=Treasury dashboard
+RefreshedOn=Refreshed on
+TotalConsolidated=Consolidated total
+NativeBalance=Native balance
+EquivalentMainCurrency=Equivalent %s
+Trend7Days=Trend (7 d)
+NbCashAccounts=Cash registers
+NbBankAccounts=Bank accounts
+TreasuryAlerts=Alerts
+AccountBelowThreshold=%s below threshold (%s)
+RefreshNow=Refresh
+NoOpenAccount=No open account
+RateMissingForCurrency=Missing rate for %s
+
+# Rate history (P4)
+RateHistoryTitle=Exchange rate history
+CurrencyPair=Currency pair
+OldRate=Old rate
+NewRate=New rate
+RateVariation=Variation
+RateAlertFlag=Alert
+RateAlertThresholdPct=Variation alert threshold (%)
+ExportCsv=Export to CSV
+RateEvolutionChart=Evolution over 90 days
+AllPairs=All pairs
+NoRateHistory=No rate history
+
+# Anomalies (P12)
+AnomaliesTitle=Detected anomalies
+NewAnomaliesCount=%s new
+AnomalyRule=Rule
+AnomalyDetail=Detail
+AnomalyAcknowledge=Acknowledge
+AnomalyMarkFalsePositive=False positive
+AnomalyViewLine=View transaction
+AnomalyStatusNew=New
+AnomalyStatusAck=Acknowledged
+AnomalyStatusFalsePositive=False positive
+AnomalyAllStatus=All
+NoAnomalyDetected=No anomaly detected
+AnomalySeverityInfo=Information
+AnomalySeverityWarning=Warning
+AnomalySeverityCritical=Critical
+# Rule labels
+RuleR01=Probable duplicate
+RuleR02=Unusual amount
+RuleR03=Old-dated transaction
+RuleR04=Abnormal exchange rate
+RuleR05=Negative balance
+RuleR06=Movement on inactive account
+RuleR01Detail=Identical transaction (close amount and date) already present on the account
+RuleR02Detail=Amount greater than %s times the 30-day average
+RuleR03Detail=Operation date older than %s days
+RuleR04Detail=Rate variation above the configured threshold
+RuleR05Detail=Account balance below the configured minimum threshold
+RuleR06Detail=Movement on an account inactive for more than %s days
+
+# Reports (P9)
+BankReportsTitle=Financial reports
+ReportType=Report type
+ReportCashFlow=Cash flow
+ReportByCategory=Analysis by category
+ReportExchangeGainLoss=Exchange gain / loss
+ReportBankJournal=Bank journal
+ReportConsolidated=Consolidated summary
+ReportDateStart=From
+ReportDateEnd=To
+GenerateReport=Generate
+TotalIn=Total in
+TotalOut=Total out
+NetBalance=Net balance
+ReportPeriod=Period
+NbOperations=Nb operations
+AverageAmount=Average amount
+ExportToExcel=Export (Excel/CSV)
+ExportToPdf=Export (PDF)
+NoDataForPeriod=No data for the selected period
+
+# Setup (admin)
+BankAuditSetupTitle=Setup - Banks & Cash Audit
+SettingsGeneral=General settings
+RateAlertThresholdDesc=Rate variation (%) above which an alert is generated
+AnomalyAvgFactorDesc=Factor (x average) above which an amount is deemed unusual (R02)
+OldDateDaysDesc=Number of days above which an operation date is deemed old (R03)
+InactiveDaysDesc=Number of inactivity days for an account (R06)
+AccountThresholds=Per-account thresholds (minimum balance)
+MinBalance=Minimum balance
+ThresholdCurrency=Threshold currency
+SaveSetup=Save
+SetupSaved=Setup saved
+AnomalyRulesConfig=Anomaly detection rules
+RuleActive=Active
+RuleThreshold=Threshold
+RuleUnit=Unit
+RuleScope=Account (empty = all)
+EmptyForNoBlocking=Empty = no blocking
+BalanceGuardDesc=Enable minimum balance guard before an internal transfer
+
+# Bank line "Suivi" tab + linked transfer line panel
+BankAuditLineHistoryTab=Tracking
+LinkedTransferLine=Linked line (transfer)
+LinkedTransferLineReadonly=Read-only preview of the linked line
+ViewLinkedLine=View linked line
+LinkedLineUpdateConfirm=This change will also be applied to the linked line of account "%s". Continue?
+LinkedLineUpdateTitle=Modifying a linked line
+AccountLabel=Account
+DateOperationShort=Operation date
+DateValueShort=Value date
+RemoveLine=Remove line
+AutoComputedField=Automatically computed (read-only)
+# Link a bank account / cash register to a warehouse
+BankAuditLinkedWarehouse=Linked warehouse / store
+BankAuditLinkedWarehouseHelp=Optionally link this account or cash register to a warehouse/store. A warehouse/store can be linked to several accounts/cash registers.
+# Reverse view: linked accounts shown on the warehouse card
+BankAuditWarehouseAccountsTitle=Linked accounts / cash registers
+BankAuditNoLinkedAccount=No account or cash register is linked to this warehouse/store.
+
+# Global audit log viewer (req 4)
+BankAuditLogMenu=Audit log
+BankAuditLogTitle=Banks and cash audit log
+BankAuditLogDesc=Full trace of creations, modifications and deletions on accounts and lines (deletions remain viewable here).
+BankAuditActionCreate=Creation
+BankAuditActionUpdate=Modification
+BankAuditActionDelete=Deletion
+BankAuditActionRestore=Restore
+BankAuditAutoSync=Auto
+BankAuditAutoSyncHelp=Change coming from the automatic synchronization of the linked line
+BankAuditManual=Manual
+BankAuditNoHistory=No record found
+# Restore of a deleted line
+BankAuditRestoreLine=Restore
+BankAuditRestored=Restored
+BankAuditRestoreDone=Line restored (new id #%s)
+BankAuditRestoreDoneLinked=Linked line restored (new id #%s)
+BankAuditRestoreInsufficientData=Not enough data to restore this line (deleted before the module update)
+BankAuditRestoreNotFound=Deletion entry not found
+BankAuditRestoreAlreadyRestored=This line has already been restored
+BankAuditRestoreInsertFailed=Failed to re-insert the line
+# Field labels
+BankAuditFieldFk_account=Account
+BankAuditFieldFk_type=Type
+BankAuditFieldAmount=Amount
+BankAuditFieldLabel=Label
+BankAuditFieldDateo=Operation date
+BankAuditFieldDatev=Value date
+BankAuditFieldNum_chq=Cheque number
+BankAuditFieldBanque=Bank
+BankAuditFieldEmetteur=Issuer
+BankAuditFieldCategories=Categories
+BankAuditFieldRef=Reference
+BankAuditFieldBank=Bank
+BankAuditFieldNumber=Account number
+BankAuditFieldCurrency_code=Currency
+BankAuditFieldAccount_number=Accounting account
+BankAuditFieldClos=Status
+BankAuditFieldNote_public=Public note
+
+# Reports center (R01..R15 + value-added)
+ReportInternalTransfers=Internal transfers
+ReportTreasuryByWarehouse=Treasury by warehouse/store
+ReportActivityByWarehouse=Financial activity by warehouse
+ReportCategoryNvsN1=Category comparison N vs N-1
+ReportReconciliation=Bank reconciliation
+ReportCashClosing=Daily cash closing
+ReportUserActivity=User entry activity
+ReportReviewMode=Management review mode
+ReportDescriptionTitle=This report allows you to
+ReportWhatFor=What is this report for?
+ReportTipR01=Detailed journal of all entries for an account or cash register over the selected period, with running balance after each operation, in/out totals and reconciliation rate. Serves as the official accounting record of movements.
+ReportTipR02=Real-time snapshot of your treasury: balance of each account and cash register, consolidated equivalent in the main currency, 7-day trend, last movement and accounts below their minimum alert threshold.
+ReportTipR03=Trend of inflows, outflows and net flow per account, grouped by week, month, quarter, year or over the whole period. Helps spot cash-tension periods.
+ReportTipR04=List of all internal transfers between accounts and cash registers: amounts in both currencies, exchange rate actually applied and gap with the system rate, to catch entry errors.
+ReportTipR05=Estimate of realized FX gains and losses on foreign-currency operations, comparing the rate on the operation date with the current rate.
+ReportTipR06=History of all exchange-rate changes: old and new rate, variation in %, who changed it and the source (manual or API).
+ReportTipR07=Treasury aggregated by warehouse/store, summing all linked accounts and cash registers, with the consolidated equivalent in the main currency. Ideal to steer a network of outlets.
+ReportTipR08=Comparison of financial activity (inflows, outflows, net flow, number of operations) of each warehouse/store over the period, to spot the most active or atypical outlets.
+ReportTipR09=Breakdown of inflows and outflows by accounting category (tags), to identify your main revenue sources and expense items.
+ReportTipR10=Comparison of category flows between the current period (N) and the equivalent previous period (N-1), with the gap in value and percentage.
+ReportTipR11=Regulatory audit trail: full history of creations, modifications and deletions on accounts and entries, with user, date, affected field and before/after values.
+ReportTipR12=Automatically detected anomalies (duplicates, unusual amounts, abnormal rates, negative balances…), with severity level and processing status.
+ReportTipR13=Bank reconciliation level per account: number of reconciled and unreconciled entries and reconciliation rate, to track matching against statements.
+ReportTipR14=Official daily cash-closing statement: movements, opening and closing balance, totals, to print and have signed by the cashier and manager.
+ReportTipR15=Data-entry activity per user: number of operations, first and last activity, to measure workload and spot unusual behavior.
+ReportTipReview=Consolidated document ready for the management meeting, combining in a single output the dashboard (R02), period flows (R03), treasury by warehouse (R07) and the N/N-1 comparison (R10).
+ReportDailyCashMatrix=Daily cash position by account
+ReportTipR16=Daily cash matrix: for each day of the period, the inflows and outflows of every account/cash register, the total flow converted to the main currency, then the consolidated end-of-day balance per currency and its equivalent in the main currency. A TOTAL row sums the period flows and shows the closing balances.
+BankAuditInflow=Inflow
+BankAuditOutflow=Outflow
+BankAuditRate=Rate
+OpeningBalance=Opening balance
+ClosingBalance=Closing balance
+ReconciliationRate=Reconciliation rate
+NbLines=Rows
+SelectedPeriod=Selected period
+PeriodN=Period N
+PeriodN1=Period N-1
+Gap=Gap
+FirstUseDate=First activity
+LastUseDate=Last activity
+FavoriteLabel=Favorite label
+SaveFavorite=Save as favorite
+Favorites=Favorites
+FavoriteSaved=Favorite saved
+FavoriteDeleted=Favorite deleted
+CompareWithPreviousPeriod=Compare with previous period
+InterCurrencyOnly=Inter-currency only
+ShowClosedAccounts=Include closed accounts
+Granularity=Granularity
+GapMinPct=Minimum rate gap (%)
+ExportHistory=Export history
+OutputFormat=Output format
+ReportAnnotation=Report annotation
+ReportExportedBy=Exported by
+ReportGeneratedOn=On
+ReportConfidential=CONFIDENTIAL
+# New entry form + 80mm cash ticket
+BankAuditNewEntry=New entry
+BankAuditEntryDate=Entry date
+BankAuditBeneficiary=Beneficiary
+BankAuditBeneficiaryHelp=Required for a debit (outgoing) entry.
+BankAuditTransactionTags=Transaction tags/categories
+BankAuditAmountMustBePositive=Amount must be greater than 0.
+BankAuditEntrySaved=Entry #%s saved. You can enter another one.
+BankAuditSaveAndPrint=Save and print entry
+BankAuditSensChangeTitle=Entry direction change
+BankAuditSensChangeWarning=You are changing the entry direction (debit <-> credit). This flips the amount sign and impacts the account balance, reconciliations and reports. Do you confirm this change?
+BankAuditTicketTitle=ENTRY RECEIPT
+BankAuditCashier=Cashier
+BankAuditPrintedOn=Printed on
+BankAuditPrint=Print
+BankAuditTicketCopies=Number of cash ticket copies (80mm)
+BankAuditTicketCopiesDesc=Number of copies printed on each "Save and print"
+BankAuditDefaultPaymentModeDesc=Payment mode pre-selected on the "New entry" form

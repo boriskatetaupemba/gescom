@@ -1,0 +1,31 @@
+# ============================================================
+#  .gitignore — Dolibarr (gescom) — racine = htdocs
+# ============================================================
+
+# --- Configuration sensible (identifiants BDD, clés, secrets) ---
+/conf/conf.php
+/conf/conf.php.old
+
+# --- Données & documents générés par l'application ---
+/documents/
+
+# --- Verrous & fichiers d'installation ---
+/install.lock
+/install/install.lock
+/install/install.forced.php
+
+# --- Cache des routes de l'API REST ---
+/api/temp/
+
+# --- Artefact local volumineux (sauvegarde, pas du code applicatif) ---
+/.well-known.zip
+
+# --- Journaux ---
+*.log
+
+# --- Fichiers système / éditeurs ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp

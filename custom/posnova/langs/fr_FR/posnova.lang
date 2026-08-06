@@ -1,0 +1,219 @@
+/* PosNova module - French translation */
+
+/* ----- Module / menus ----- */
+ModulePosNovaDesc=Point de vente moderne multi-devises (USD/CDF) pour la RD Congo
+ModulePosNovaDescLong=PosNova est un point de vente complet, tactile et hors-ligne, gérant les sessions de caisse, le taux de change journalier, les paiements multi-devises avec rendu de monnaie, les transferts de stock et la séparation comptable des factures de caisse.
+PosNovaMenu=PosNova
+PosNovaLaunch=Ouvrir une caisse
+PosNovaDailyRate=Taux du jour
+PosNovaInvoices=Factures de caisse
+PosNovaSessions=Sessions de caisse
+PosNovaConfig=Configuration
+PosNovaSetup=Configuration PosNova
+PosNovaTerminals=Terminaux
+PosNovaTerminal=Terminal
+
+/* ----- Terminal (caisse) ----- */
+PosNovaVendor=Vendeur
+PosNovaWorkingCurrency=Devise de travail
+PosNovaSession=Session
+PosNovaTickets=tickets
+PosNovaTransfer=Transfert
+PosNovaAlerts=Alertes
+PosNovaOnline=En ligne
+PosNovaOffline=Hors ligne
+PosNovaLock=Verrouiller
+PosNovaCloseSession=Clôturer la caisse
+PosNovaSearchProduct=Rechercher un produit (réf, nom, code-barres)…
+PosNovaSearchCustomer=Rechercher un client…
+PosNovaAllCategories=Toutes les catégories
+PosNovaInStockOnly=En stock uniquement
+PosNovaInvoiceDate=Date de facture
+PosNovaColProduct=Produit
+PosNovaColPrice=Prix
+PosNovaColQty=Qté
+PosNovaColDiscount=Remise
+PosNovaColTotal=Total
+PosNovaEmptyCart=Panier vide
+PosNovaEmptyCartHint=Cliquez sur un produit pour l'ajouter au ticket
+PosNovaSubtotal=Sous-total
+PosNovaTotalDiscount=Remise totale
+PosNovaGrandTotal=Total à payer
+PosNovaPayCheckout=Encaisser
+PosNovaClearCart=Vider le panier
+PosNovaAddToCart=Ajouter
+PosNovaWalkInCustomer=Client comptoir
+PosNovaRateManual=Taux manuel
+PosNovaRateSystem=Taux système
+
+/* ----- Fiche produit (modale) ----- */
+PosNovaStockByWarehouse=Stock par entrepôt
+PosNovaAvailable=Disponible
+PosNovaReserved=Réservé
+PosNovaPhysical=Physique
+
+/* ----- Paiement ----- */
+PosNovaPaymentTitle=Encaissement
+PosNovaReceived=Reçu
+PosNovaChange=Rendu
+PosNovaRemaining=Reste à payer
+PosNovaConfirmPayment=Valider l'encaissement
+PosNovaMissing=Manquant
+PosNovaCovered=Couvert
+PosNovaSurplus=Surplus
+PosNovaReference=Référence
+PosNovaMode=Mode
+PosNovaSaleDone=Vente enregistrée
+PosNovaPriceLocked=Modification du prix non autorisée
+PosNovaCatalogUpdated=Catalogue mis à jour
+
+/* ----- Taux du jour ----- */
+PosNovaRateOfTheDay=Taux du jour
+PosNovaSetManualRate=Définir le taux manuel
+PosNovaRateUsdCdf=Taux 1 USD =
+PosNovaSystemReference=Référence système
+PosNovaRateHistory=Historique des taux
+PosNovaNoRateHistory=Aucun taux enregistré
+PosNovaRateSaved=Taux enregistré
+PosNovaSetRate=Définir le taux
+
+/* ----- Lanceur / sessions (pos.php) ----- */
+PosNovaChooseTerminal=Choisir un terminal
+PosNovaChooseTerminalHint=Sélectionnez la caisse à ouvrir
+PosNovaNoTerminal=Aucun terminal disponible
+PosNovaCreateTerminal=Créer un terminal
+PosNovaSessionInProgress=Session en cours
+PosNovaInitialFunds=Fonds de caisse initial
+PosNovaInitialFund=Fonds initial
+PosNovaOpenSession=Ouvrir la session
+PosNovaResumeSession=Reprendre la session
+PosNovaUnlockResume=Déverrouiller et reprendre
+PosNovaPin=Code PIN
+PosNovaLockSession=Caisse verrouillée
+PosNovaLockSessionHint=Saisissez votre code PIN pour reprendre
+PosNovaSessionLocked=Session verrouillée
+PosNovaExpectedInDrawer=Montant attendu en caisse
+PosNovaCountedCash=Espèces comptées
+PosNovaExpected=Attendu
+PosNovaCounted=Compté
+PosNovaDiscrepancy=Écart
+PosNovaConfirmClose=Confirmer la clôture
+PosNovaSessionClosed=Session clôturée
+PosNovaBackToTerminals=Retour aux terminaux
+PosNovaZReport=Rapport Z
+PosNovaOpenedBy=Ouverte par
+PosNovaReconnections=Reconnexions
+PosNovaCashReconciliation=Rapprochement de caisse
+PosNovaNoSession=Aucune session
+PosNovaStatusOpen=Ouverte
+PosNovaStatusLocked=Verrouillée
+PosNovaStatusClosed=Clôturée
+PosNovaStatusCancelled=Annulée
+
+/* ----- Factures de caisse ----- */
+PosNovaTicketRef=Réf. ticket
+PosNovaBackdated=Date antidatée
+PosNovaNoInvoice=Aucune facture
+PosNovaStatusValidated=Validé
+PosNovaStatusCancelPending=Annulation en attente
+PosNovaOrigin=Origine
+PosNovaPointOfSale=Point de vente
+
+/* ----- Configuration (setup.php) ----- */
+PosNovaRoundingCdf=Arrondi CDF
+PosNovaRoundingCdfHelp=Règle d'arrondi appliquée lors de la conversion vers le franc congolais.
+PosNovaRounding_DOWN_UNIT=Arrondi inférieur à l'unité
+PosNovaRounding_NEAREST_UNIT=Arrondi à l'unité la plus proche
+PosNovaRounding_NEAREST_5=Arrondi au multiple de 5 le plus proche
+PosNovaCdfCurrencyCode=Code ISO de la devise locale
+PosNovaSessionLifetime=Durée de vie de la session
+PosNovaCatalogPageSize=Taille de page du catalogue
+PosNovaPollInterval=Intervalle de rafraîchissement
+PosNovaDefaultPrintFormat=Format d'impression par défaut
+PosNovaTransferTimeout=Délai de réservation des transferts
+PosNovaCancelEscalation=Délai d'escalade des annulations
+PosNovaFallbackMulticurrency=Repli sur le taux multidevise
+PosNovaFallbackMulticurrencyHelp=Utiliser le taux du module Multidevise lorsqu'aucun taux journalier n'est défini.
+
+/* ----- Fiche terminal (pos_card.php) ----- */
+PosNovaTerminalCreated=Terminal créé
+PosNovaConfigureAccountsNow=Configurez maintenant les comptes de caisse
+PosNovaEditTerminal=Modifier le terminal
+PosNovaDeleteTerminal=Supprimer le terminal
+PosNovaConfirmDeleteTerminal=Confirmez-vous la suppression du terminal %s ?
+PosNovaWarehouseHelp=Entrepôt source des stocks et de la déduction des ventes.
+PosNovaWarehouseLockedHasSales=Verrouillé : des ventes existent déjà sur cet entrepôt.
+PosNovaDefaultPaymentModeHelp=Mode de règlement présélectionné à l'écran d'encaissement (espèces, carte, mobile money…). Le caissier peut le changer à chaque vente.
+PosNovaMaxDiscountHelp=Remise maximale, en pourcentage, qu'un caissier peut appliquer sur une ligne ou un ticket. Mettez 0 pour interdire toute remise.
+PosNovaAllowPriceEditHelp=Autorise le caissier à modifier manuellement le prix de vente unitaire pendant la vente. À réserver au personnel de confiance.
+PosNovaAllowSaleWithoutStockHelp=Permet de vendre un produit même si le stock disponible est nul ou insuffisant (stock négatif autorisé). Sinon la vente est bloquée.
+PosNovaTransferEnabledHelp=Affiche le bouton de transfert de stock sur cette caisse pour réapprovisionner l'entrepôt depuis un autre dépôt.
+PosNovaOfflineModeHelp=Permet de continuer à encaisser sans connexion : les tickets sont mis en file et synchronisés au retour du réseau.
+PosNovaAllowBackdatingHelp=Autorise la saisie d'une date de facture antérieure à aujourd'hui. À n'activer que pour des régularisations exceptionnelles.
+PosNovaAutoprintHelp=Lance automatiquement l'impression du reçu dès qu'une vente est validée, sans clic supplémentaire.
+PosNovaPrintFormatHelp=Largeur du ticket envoyé à l'imprimante : 80mm ou 58mm pour les imprimantes thermiques, A4 pour une imprimante bureautique.
+PosNovaDefaultCustomerHelp=Client générique attribué aux ventes au comptoir lorsqu'aucun client n'est sélectionné (ex. « Client comptoir »).
+PosNovaLowStockThresholdHelp=Quantité en dessous de laquelle un produit est signalé en stock faible dans le catalogue de la caisse.
+PosNovaTransferTimeoutHelp=Durée, en heures, pendant laquelle le stock réservé par un transfert reste bloqué avant libération automatique.
+PosNovaCancelEscalationHelp=Délai, en minutes, au-delà duquel une demande d'annulation non traitée est remontée à un responsable.
+PosNovaStatusHelp=Un terminal inactif n'apparaît plus dans la liste des caisses ouvrables, sans supprimer son historique.
+PosNovaDefaultPaymentMode=Mode de paiement par défaut
+PosNovaMaxDiscount=Remise maximale
+PosNovaAllowPriceEdit=Autoriser la modification du prix
+PosNovaAllowSaleWithoutStock=Autoriser la vente sans stock
+PosNovaTransferEnabled=Transferts activés
+PosNovaOfflineMode=Mode hors ligne
+PosNovaAllowBackdating=Autoriser l'antidatage
+PosNovaAutoprint=Impression automatique
+PosNovaPrintFormat=Format d'impression
+PosNovaDefaultCustomer=Client par défaut
+PosNovaLowStockThreshold=Seuil de stock faible
+PosNovaCashAccounts=Comptes de caisse
+PosNovaActive=Actif
+PosNovaDefaultAccount=Compte par défaut
+PosNovaAccountsHelp=Activez au moins un compte USD et un compte CDF, puis désignez un compte par défaut.
+PosNovaNoWarehouseAccount=Aucun compte bancaire/caisse disponible. Créez-en dans le module Banque.
+PosNovaIncomplete=Incomplet
+PosNovaWorkingCurrency=Devise de travail
+PosNovaLinkedWarehouse=Entrepôt lié
+PosNovaLinkedWarehouseHelp=Entrepôt physique géré par cette caisse.
+
+/* ----- Erreurs serveur ----- */
+PosNovaGenericError=Une erreur est survenue
+PosNovaErrInvalidRate=Taux invalide
+PosNovaErrCannotLaunch=Impossible d'ouvrir cette caisse
+PosNovaErrNoRate=Aucun taux du jour défini
+PosNovaErrWrongPin=Code PIN incorrect
+PosNovaErrPinTooShort=Code PIN trop court
+PosNovaErrPosNotFound=Terminal introuvable
+PosNovaErrSessionNotOpen=Session non ouverte
+PosNovaErrSessionOtherUser=Session ouverte par un autre utilisateur
+PosNovaErrSessionAlreadyOpen=Une session est déjà ouverte sur ce terminal
+PosNovaErrPendingSync=Des tickets hors ligne ne sont pas encore synchronisés
+PosNovaErrEmptyCart=Le panier est vide
+PosNovaErrNoCustomer=Aucun client sélectionné
+PosNovaErrInvoiceCreate=Échec de la création de la facture
+PosNovaErrBadLine=Ligne de vente invalide
+PosNovaErrProductNotFound=Produit introuvable
+PosNovaErrProductNotForSale=Produit non destiné à la vente
+PosNovaErrDiscountOverCap=Remise supérieure au plafond autorisé
+PosNovaErrInsufficientStock=Stock insuffisant
+PosNovaErrAddLine=Échec de l'ajout d'une ligne
+PosNovaErrPaymentNotCovered=Paiement insuffisant
+PosNovaErrChangeTooHigh=Rendu de monnaie supérieur au surplus
+PosNovaErrInvoiceValidate=Échec de la validation de la facture
+PosNovaErrStockOut=Échec de la sortie de stock
+PosNovaErrStockIn=Échec de l'entrée en stock
+PosNovaErrNoWarehouse=Aucun entrepôt configuré
+PosNovaErrNoUsdAccount=Aucun compte USD actif
+PosNovaErrNoCdfAccount=Aucun compte CDF actif
+PosNovaErrNoDefaultAccount=Aucun compte par défaut désigné
+PosNovaErrCannotDeleteHasSales=Suppression impossible : des ventes existent sur ce terminal
+PosNovaErrNoTransferRight=Droit de transfert manquant
+PosNovaErrBadTransfer=Transfert invalide
+PosNovaErrSameWarehouse=Entrepôts source et destination identiques
+PosNovaErrMotifRequired=Motif obligatoire
+PosNovaErrTransferNotPending=Transfert non en attente
+PosNovaErrNotInitiator=Vous n'êtes pas l'initiateur de ce transfert
+PosNovaOutOfStock=Rupture de stock
+PosNovaDiscountOverCap=Remise au-delà du plafond
