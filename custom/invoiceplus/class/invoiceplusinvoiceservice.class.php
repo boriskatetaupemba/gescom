@@ -59,6 +59,9 @@ class InvoicePlusInvoiceService
 	/** @var int */
 	private $maxApiLimit;
 
+	/** @var bool|null */
+	private $hasBankAccountWarehouseField = null;
+
 	/**
 	 * @param DoliDB $db   Database handler
 	 * @param User   $user Authenticated API user
@@ -416,10 +419,7 @@ class InvoicePlusInvoiceService
 	private function buildInvoiceConditions($warehouseId, array $options)
 	{
 		$sql = ' WHERE t.entity IN ('.getEntity('invoice').')';
-		$sql .= ' AND EXISTS (';
-		$sql .= 'SELECT 1 FROM '.MAIN_DB_PREFIX.'facturedet AS fd';
-		$sql .= ' WHERE fd.fk_facture = t.rowid AND fd.fk_warehouse = '.((int) $warehouseId);
-		$sql .= ')';
+		$sql .= ' AND '.$this->buildWarehouseMembershipCondition((int) $warehouseId);
 
 		$socids = '';
 		if (!empty($this->user->socid)) {
@@ -486,6 +486,106 @@ class InvoicePlusInvoiceService
 		}
 
 		return $sql;
+	}
+
+	/**
+	 * Build the warehouse-membership predicate.
+	 *
+	 * An explicit facturedet.fk_warehouse assignment is authoritative. Legacy
+	 * invoices whose lines are all unassigned may be resolved through standard
+	 * stock movements, PosNova tickets, TakePOS terminal configuration or the
+	 * existing bank-account warehouse extrafield.
+	 *
+	 * @param int $warehouseId Warehouse id
+	 * @return string          Parenthesized SQL predicate
+	 */
+	private function buildWarehouseMembershipCondition($warehouseId)
+	{
+		$warehouseId = (int) $warehouseId;
+		$direct = 'EXISTS (';
+		$direct .= 'SELECT 1 FROM '.MAIN_DB_PREFIX.'facturedet AS fd';
+		$direct .= ' WHERE fd.fk_facture = t.rowid AND fd.fk_warehouse = '.$warehouseId;
+		$direct .= ')';
+
+		if (!getDolGlobalInt('INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS', 1)) {
+			return '('.$direct.')';
+		}
+
+		$fallbacks = array();
+
+		// Native invoice validation records the invoice as stock-movement origin.
+		$fallbacks[] = 'EXISTS ('
+			.'SELECT 1 FROM '.MAIN_DB_PREFIX.'stock_mouvement AS sm'
+			.' WHERE sm.fk_origin = t.rowid'
+			." AND sm.origintype IN ('facture', 'invoice')"
+			.' AND sm.fk_entrepot = '.$warehouseId
+			.')';
+
+		// PosNova stores the immutable warehouse on the terminal configuration.
+		if (isModEnabled('posnova')) {
+			$fallbacks[] = 'EXISTS ('
+				.'SELECT 1 FROM '.MAIN_DB_PREFIX.'pos_ticket AS pt'
+				.' INNER JOIN '.MAIN_DB_PREFIX.'pos_config AS pc ON pc.rowid = pt.fk_pos AND pc.entity = pt.entity'
+				.' WHERE pt.fk_facture = t.rowid AND pt.entity = t.entity'
+				.' AND pc.fk_warehouse = '.$warehouseId
+				.')';
+		}
+
+		// TakePOS keeps its forced warehouse in CASHDESK_ID_WAREHOUSE{terminal}.
+		if (isModEnabled('takepos')) {
+			$fallbacks[] = 'EXISTS ('
+				.'SELECT 1 FROM '.MAIN_DB_PREFIX.'const AS tc'
+				." WHERE t.module_source = 'takepos'"
+				." AND tc.name = CONCAT('CASHDESK_ID_WAREHOUSE', t.pos_source)"
+				.' AND tc.entity IN (0, t.entity)'
+				." AND tc.value = '".$warehouseId."'"
+				.')';
+		}
+
+		// BankAudit/PosNova already provide this explicit cash-account mapping.
+		if ($this->hasBankAccountWarehouseField()) {
+			$fallbacks[] = 'EXISTS ('
+				.'SELECT 1 FROM '.MAIN_DB_PREFIX.'bank_account_extrafields AS bae'
+				.' WHERE bae.fk_object = t.fk_account'
+				.' AND bae.warehouse = '.$warehouseId
+				.')';
+		}
+
+		$noExplicitWarehouse = 'NOT EXISTS (';
+		$noExplicitWarehouse .= 'SELECT 1 FROM '.MAIN_DB_PREFIX.'facturedet AS assigned_fd';
+		$noExplicitWarehouse .= ' WHERE assigned_fd.fk_facture = t.rowid';
+		$noExplicitWarehouse .= ' AND COALESCE(assigned_fd.fk_warehouse, 0) > 0';
+		$noExplicitWarehouse .= ')';
+
+		return '('.$direct.' OR ('.$noExplicitWarehouse.' AND ('.implode(' OR ', $fallbacks).')))';
+	}
+
+	/**
+	 * Detect the optional bank_account_extrafields.warehouse column through
+	 * Dolibarr's extrafield metadata, avoiding a reference to a missing column.
+	 *
+	 * @return bool True when the configured extrafield exists
+	 */
+	private function hasBankAccountWarehouseField()
+	{
+		if ($this->hasBankAccountWarehouseField !== null) {
+			return $this->hasBankAccountWarehouseField;
+		}
+
+		$this->hasBankAccountWarehouseField = false;
+		$sql = 'SELECT rowid FROM '.MAIN_DB_PREFIX.'extrafields';
+		$sql .= " WHERE elementtype = 'bank_account' AND name = 'warehouse'";
+		$sql .= $this->db->plimit(1);
+		$result = $this->db->query($sql);
+		if (!$result) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_WARNING);
+			return false;
+		}
+
+		$this->hasBankAccountWarehouseField = ($this->db->num_rows($result) > 0);
+		$this->db->free($result);
+
+		return $this->hasBankAccountWarehouseField;
 	}
 
 	/**

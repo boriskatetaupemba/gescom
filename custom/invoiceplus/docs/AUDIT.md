@@ -61,7 +61,7 @@ InvoicePlus does not reproduce these fields. Its native `Invoices::get()` call i
 
 The installed warehouse API requires `stock.lire`, fetches `Entrepot`, and applies `_checkAccessToResource('stock', id, 'entrepot')`. InvoicePlus repeats those checks and explicitly verifies the warehouse's entity against `getEntity('stock')`.
 
-The invoice query uses:
+The invoice query first uses the authoritative line assignment:
 
 ```sql
 WHERE t.entity IN (getEntity('invoice'))
@@ -74,3 +74,14 @@ AND EXISTS (
 ```
 
 The literal SQL is assembled with `MAIN_DB_PREFIX`; the conceptual placeholder above is documentation only. Pagination is applied to invoice ids, and the separate count query counts invoice rows rather than invoice lines.
+
+The supplied native API sample shows that invoices 214 through 223 have `fk_warehouse = 0` on every line. A strict `facturedet.fk_warehouse = <warehouse>` predicate therefore cannot return them, regardless of the requested warehouse id. The sample also shows `fk_account = 9` and no usable `module_source`/`pos_source` value.
+
+InvoicePlus 1.0.1 keeps a positive line warehouse authoritative. Only when no line has a positive warehouse does it try these existing relations, in order-independent `EXISTS` predicates:
+
+1. native `stock_mouvement` rows whose origin is the invoice;
+2. `pos_ticket -> pos_config.fk_warehouse` when PosNova is enabled;
+3. TakePOS `CASHDESK_ID_WAREHOUSE{terminal}` configuration when TakePOS source data exists;
+4. the existing `bank_account_extrafields.warehouse` mapping for `facture.fk_account`, when that extrafield is declared.
+
+This is a read-only compatibility path. It does not manufacture a warehouse and does not alter old invoice lines. If none of these sources contains the requested warehouse, the invoice is correctly excluded. The path can be disabled with `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=0`.
