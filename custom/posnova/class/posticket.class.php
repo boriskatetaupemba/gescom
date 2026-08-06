@@ -208,6 +208,18 @@ class PosTicket
 				return $fail($facture->error ? $facture->error : 'PosNovaErrAddLine');
 			}
 
+			// Facture::addline() in Dolibarr 20.0.4 has no warehouse argument even
+			// though FactureLigne persists fk_warehouse. Store the terminal warehouse
+			// immediately on the newly created line so native APIs and downstream
+			// modules can resolve the sale without depending on PosNova tables.
+			$sqlWarehouse = 'UPDATE '.MAIN_DB_PREFIX.'facturedet';
+			$sqlWarehouse .= ' SET fk_warehouse = '.((int) $pos->fk_warehouse);
+			$sqlWarehouse .= ' WHERE rowid = '.((int) $res);
+			$sqlWarehouse .= ' AND fk_facture = '.((int) $facture->id);
+			if (!$this->db->query($sqlWarehouse)) {
+				return $fail($this->db->lasterror());
+			}
+
 			$lineTtcPos = PosNova::roundAmount($lineTtcPosUnit * $qty * (1 - $discount / 100), $posCurrency);
 			$lineHtPos = $tva_tx > 0 ? ($lineTtcPos / (1 + $tva_tx / 100)) : $lineTtcPos;
 			$posTotalTtc += $lineTtcPos;
@@ -270,7 +282,7 @@ class PosTicket
 		// --- Stock out on the POS warehouse ---
 		foreach ($preparedLines as $pl) {
 			$mv = new MouvementStock($this->db);
-			$mv->origin = $facture;
+			$mv->setOrigin('facture', (int) $facture->id);
 			$label = $langs->trans('PosNovaStockOutLabel');
 			$resmv = $mv->livraison($user, $pl['fk_product'], (int) $pos->fk_warehouse, $pl['qty'], 0, $label, dol_now(), '', '', '', 0, 'POSNOVA');
 			if ($resmv < 0) {

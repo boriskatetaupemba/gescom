@@ -1,6 +1,6 @@
-# InvoicePlus 1.0.0
+# InvoicePlus 1.0.1
 
-InvoicePlus is an extensible Dolibarr module for customer-invoice services. Its first endpoint lists the invoices having at least one standard invoice line assigned to a requested warehouse:
+InvoicePlus is an extensible Dolibarr module for customer-invoice services. Its first endpoint lists invoices assigned to a requested warehouse. It uses the standard invoice-line warehouse when present and can resolve legacy POS invoices whose lines still contain `fk_warehouse = 0`:
 
 ```text
 GET /api/index.php/invoiceplus/warehouse/{warehouse_id}
@@ -30,7 +30,7 @@ The complete audit is in [docs/AUDIT.md](docs/AUDIT.md).
 2. Extract `invoiceplus.zip` so the resulting path is `htdocs/custom/invoiceplus/`.
 3. Check that the web-server user can read the extracted files.
 4. In **Home > Setup > Modules/Applications**, enable REST API, Customer Invoices, Stocks, then Invoice Plus.
-5. Open Invoice Plus setup and review the four constants.
+5. Open Invoice Plus setup and review the five constants.
 6. If `API_PRODUCTION_MODE` is enabled, clear Dolibarr's REST/Restler cache or disable and re-enable the REST API module so the explorer is regenerated.
 
 The archive contains a top-level `invoiceplus/` directory and is directly suitable for extraction under `htdocs/custom/`.
@@ -43,6 +43,7 @@ The archive contains a top-level `invoiceplus/` directory and is directly suitab
 | `INVOICEPLUS_MAX_API_LIMIT` | `1000` | Caps page size; `limit<=0` uses this cap. |
 | `INVOICEPLUS_ADD_WAREHOUSE_METADATA` | `1` | Adds non-persistent `invoiceplus_warehouse_filter`. |
 | `INVOICEPLUS_LOAD_CLOSURE_DATA` | `1` | Keeps the exact native `invoiceclosure` property. `0` removes it from InvoicePlus responses. |
+| `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS` | `1` | For invoices with no assigned line warehouse, resolves legacy records from native stock movements, PosNova ticket configuration, TakePOS terminal configuration, or the bank-account `warehouse` extrafield. |
 
 ## Endpoint parameters
 
@@ -60,7 +61,7 @@ The archive contains a top-level `invoiceplus/` directory and is directly suitab
 | `loadlinkedobjects` | `false` | `false` reproduces the list endpoint's unloaded `linkedObjectsIds`; `true` keeps the single-invoice native linked ids. |
 | `date_start`, `date_end` | empty | Strict `YYYY-MM-DD`, applied to invoice date `datef`, inclusive. |
 | `withLines` | `true` | Removes `lines` only when false. |
-| `warehouse_lines_only` | `false` | Filters response lines by `fk_warehouse`; official invoice and payment totals remain unchanged. |
+| `warehouse_lines_only` | `false` | Filters response lines by their actual `fk_warehouse`; official invoice and payment totals remain unchanged. A legacy invoice selected by a fallback can therefore have an empty `lines` array when all its native lines still contain `0`. |
 
 `pagination_data=false` returns a JSON array. Dolibarr 20.0.4 has no native invoice pagination envelope, so `pagination_data=true` uses the documented fallback:
 
@@ -82,7 +83,7 @@ The route requires authenticated REST access plus both `facture.lire` and `stock
 
 External users are forced to their own `socid`. Internal users without the global customer-view permission are restricted through `societe_commerciaux`, matching the installed native invoice list. Finally, every selected invoice passes through `Invoices::get()`, which applies `_checkAccessToResource('facture', id)` before returning data.
 
-The `EXISTS` warehouse predicate guarantees one occurrence per invoice even when several matching lines exist. User values never select the warehouse SQL expression or the sort field.
+An explicit positive `facturedet.fk_warehouse` is authoritative. Fallbacks are considered only when every invoice line is unassigned (`NULL` or `0`), so a POS/account mapping cannot override a real line warehouse. Invoice-level `EXISTS` predicates guarantee one occurrence per invoice even when several matching records exist. User values never select the warehouse SQL expression or the sort field.
 
 ## InvoiceClosure integration
 
@@ -112,6 +113,8 @@ Pass `InvoiceId`/`INVOICE_ID` for a record belonging to the tested warehouse. Th
 ## Performance and limitations
 
 - Native response construction performs one native invoice fetch per selected id. This intentionally follows Dolibarr's own list implementation and prevents format/security drift.
+- Warehouse fallbacks add indexed existence checks for legacy invoices. Set `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=0` to restore strict line-only selection.
+- Fallback resolution does not rewrite historical data or alter the native `/invoices` response: its line-level `fk_warehouse` values remain exactly as stored. PosNova 1.0.1 writes the warehouse on newly created invoice lines and records the invoice as stock-movement origin.
 - `closed` and `paid_not_closed` scan eligible paid ids through the public InvoiceClosure method before pagination. This is slower on very large paid-invoice sets but preserves module encapsulation and exact pagination counts. A future public batch method in InvoiceClosure can replace this without changing the endpoint.
 - `pagination_data`, date filtering, `withLines`, `warehouse_lines_only`, and the maximum page cap are InvoicePlus extensions because the installed 20.0.4 native `Invoices::index()` does not expose them.
 - Live HTTP and database integration tests require the deployed Dolibarr database and API authentication; they cannot be truthfully completed against a source-only checkout.

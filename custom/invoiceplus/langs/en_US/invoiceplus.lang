@@ -17,3 +17,5 @@ SetupINVOICEPLUS_ADD_WAREHOUSE_METADATA=Add warehouse filter metadata
 SetupINVOICEPLUS_ADD_WAREHOUSE_METADATAHelp=Adds invoiceplus_warehouse_filter to each response object; it is never persisted.
 SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Keep InvoiceClosure data
 SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Keeps the exact invoiceclosure property added by the native invoices API when InvoiceClosure is enabled and authorized.
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=Resolve legacy warehouse associations
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKSHelp=When invoice lines have no warehouse, use native stock movements, PosNova tickets, TakePOS terminal configuration, or the linked cash account warehouse.

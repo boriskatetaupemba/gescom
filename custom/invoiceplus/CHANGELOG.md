@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-08-06
+
+- Kept positive invoice-line warehouse assignments authoritative.
+- Added read-only resolution for legacy invoices whose lines contain only `fk_warehouse = 0` or `NULL`.
+- Added standard stock-movement, PosNova, TakePOS, and declared bank-account warehouse sources.
+- Added `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS` to switch compatibility resolution off when strict line-only matching is required.
+- Documented that native invoice payloads and historical line values are never rewritten.
+
 ## 1.0.0 - 2026-08-06
 
 - Added installable InvoicePlus module descriptor and administration pages.

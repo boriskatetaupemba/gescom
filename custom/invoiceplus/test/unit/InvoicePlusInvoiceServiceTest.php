@@ -117,6 +117,27 @@ class InvoicePlusInvoiceServiceTest extends TestCase
 	}
 
 	/**
+	 * Legacy fallback selection must not pretend that unassigned native lines
+	 * belong to the requested warehouse.
+	 *
+	 * @return void
+	 */
+	public function testWarehouseLineFilteringRemovesLegacyUnassignedLines()
+	{
+		$response = new stdClass();
+		$response->total_ttc = '42.00';
+		$line = new stdClass();
+		$line->id = 12;
+		$line->fk_warehouse = 0;
+		$response->lines = array($line);
+
+		$result = $this->service->filterInvoiceLines($response, 5, true, true);
+
+		$this->assertSame(array(), $result->lines);
+		$this->assertSame('42.00', $result->total_ttc);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testPaginationEnvelope()

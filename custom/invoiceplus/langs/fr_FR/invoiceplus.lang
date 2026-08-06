@@ -17,3 +17,5 @@ SetupINVOICEPLUS_ADD_WAREHOUSE_METADATA=Ajouter les métadonnées du filtre d'en
 SetupINVOICEPLUS_ADD_WAREHOUSE_METADATAHelp=Ajoute invoiceplus_warehouse_filter à chaque réponse ; cette propriété n'est jamais enregistrée.
 SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Conserver les données InvoiceClosure
 SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Conserve exactement la propriété invoiceclosure ajoutée par l'API native lorsque InvoiceClosure est actif et que l'utilisateur possède le droit de lecture.
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=Résoudre les associations d'entrepôt historiques
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKSHelp=Lorsque les lignes n'ont aucun entrepôt, utilise les mouvements de stock natifs, les tickets PosNova, la configuration du terminal TakePOS ou l'entrepôt lié au compte de caisse.
