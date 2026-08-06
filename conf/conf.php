@@ -5,14 +5,14 @@
 // Take a look at conf.php.example file for an example of conf.php file
 // and explanations for all possibles parameters.
 //
-$dolibarr_main_url_root='https://admin.quinleysarlu.com';
-$dolibarr_main_document_root="/home/c2554062c/public_html/gescom";
+$dolibarr_main_url_root='https://dev-admin.quinleysarlu.com';
+$dolibarr_main_document_root="/home/c2554062c/public_html/gescomdev";
 $dolibarr_main_url_root_alt='/custom';
-$dolibarr_main_document_root_alt="/home/c2554062c/public_html/gescom/custom";
-$dolibarr_main_data_root="/home/c2554062c/gescom";
+$dolibarr_main_document_root_alt="/home/c2554062c/public_html/gescomdev/custom";
+$dolibarr_main_data_root="/home/c2554062c/gescomdev";
 $dolibarr_main_db_host='localhost';
 $dolibarr_main_db_port='0';
-$dolibarr_main_db_name='c2554062c_gescom';
+$dolibarr_main_db_name='c2554062c_gescom_dev';
 $dolibarr_main_db_prefix='qL_';
 $dolibarr_main_db_user='c2554062c_gescom';
 $dolibarr_main_db_pass='NpK.045p).K(7(8S';
