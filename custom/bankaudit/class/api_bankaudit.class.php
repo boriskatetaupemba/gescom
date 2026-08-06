@@ -191,12 +191,14 @@ class BankAuditApi extends DolibarrApi
 		}
 		$this->db->free($result);
 
-		// Attach the transaction categories (tags) of each entry (multi-value link table bank_class -> categorie)
+		// Attach the transaction categories (tags) of each entry (multi-value link table bank_class -> bank_categ).
+		// Bank-line tags ("Tags/categories des transactions") live in llx_bank_categ, NOT llx_categorie
+		// (see Categorie::containing() special-case for TYPE_BANK_LINE).
 		if (!empty($lineids)) {
 			$catmap = array();
 			$sqlcat = "SELECT bc.lineid, c.rowid, c.label";
 			$sqlcat .= " FROM ".MAIN_DB_PREFIX."bank_class as bc";
-			$sqlcat .= " INNER JOIN ".MAIN_DB_PREFIX."categorie as c ON c.rowid = bc.fk_categ";
+			$sqlcat .= " INNER JOIN ".MAIN_DB_PREFIX."bank_categ as c ON c.rowid = bc.fk_categ";
 			$sqlcat .= " WHERE bc.lineid IN (".$this->db->sanitize(implode(',', $lineids)).")";
 			$sqlcat .= " AND c.entity IN (".getEntity('category').")";
 			$resqlcat = $this->db->query($sqlcat);
