@@ -1,0 +1,21 @@
+# InvoicePlus - English
+ModuleInvoicePlusName=Invoice Plus
+ModuleInvoicePlusDesc=Extensible REST services for customer invoices
+ModuleInvoicePlusDescLong=InvoicePlus adds secure, native-compatible customer invoice services without modifying Dolibarr core files.
+InvoicePlus=Invoice Plus
+InvoicePlusSetup=Invoice Plus setup
+InvoicePlusSetupDesc=Configure the warehouse invoice endpoint. Changes apply to the current entity.
+InvoicePlusAbout=About Invoice Plus
+InvoicePlusApiEndpoint=REST endpoint
+InvoicePlusAboutArchitecture=Invoice responses are constructed by the installed native Invoices API; InvoicePlus only selects invoices and applies optional response filters.
+InvoicePlusInvalidMaxLimit=The maximum API limit must be between 1 and 10000.
+SetupINVOICEPLUS_API_ENABLED=Enable the REST endpoint
+SetupINVOICEPLUS_API_ENABLEDHelp=When disabled, InvoicePlus REST calls return HTTP 403.
+SetupINVOICEPLUS_MAX_API_LIMIT=Maximum API page size
+SetupINVOICEPLUS_MAX_API_LIMITHelp=Limits the effective value of the limit parameter. A requested value of zero also uses this maximum.
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATA=Add warehouse filter metadata
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATAHelp=Adds invoiceplus_warehouse_filter to each response object; it is never persisted.
+SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Keep InvoiceClosure data
+SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Keeps the exact invoiceclosure property added by the native invoices API when InvoiceClosure is enabled and authorized.
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=Resolve legacy warehouse associations
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKSHelp=When invoice lines have no warehouse, use native stock movements, PosNova tickets, TakePOS terminal configuration, or the linked cash account warehouse.

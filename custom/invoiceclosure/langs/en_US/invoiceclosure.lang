@@ -1,0 +1,80 @@
+# Copyright (C) 2026 InvoiceClosure module
+# English language file of the Invoice closure module
+
+# Module
+ModuleInvoiceClosureName=Invoice closure
+ModuleInvoiceClosureDesc=Adds a business status "Closed" after the standard "Paid" status of a customer invoice, without modifying the Dolibarr core.
+InvoiceClosure=Invoice closure
+InvoiceClosureColumn=Closure
+InvoiceClosureSetup=Setup - Invoice closure
+InvoiceClosureSetupDesc=Settings of the business status "Closed" of customer invoices. The standard Dolibarr status "Paid" is never modified by this module.
+InvoiceClosureAbout=About - Invoice closure
+InvoiceClosureAboutWorkflow=Managed workflow: Draft → Validated → Paid → Closed. The closure is a complementary business status: the invoice remains "Paid" for Dolibarr.
+InvoiceClosureApiEndpoint=REST API endpoint
+
+# Actions and buttons
+CloseInvoice=Close invoice
+ReopenInvoiceClosure=Reopen closure
+ConfirmCloseInvoice=Confirm the closure of this invoice? Its Dolibarr status will remain "Paid".
+ConfirmReopenInvoice=Confirm the reopening of this invoice? It will return to the business status "Paid" without becoming unpaid.
+InvoiceClosureSuccessful=The invoice has been closed successfully.
+InvoiceClosureReopened=The closure of the invoice has been reopened.
+
+# Status and display
+InvoiceClosed=Closed
+InvoiceNotClosed=Not closed
+InvoiceClosedBadgeHelp=Business status of the Invoice closure module. The standard Dolibarr status remains "Paid".
+InvoiceClosureBusinessStatus=Business status (closure)
+ClosureDate=Closure date
+ClosedBy=Closed by
+ClosureNote=Closure note
+ReopenNote=Reopen note
+LastReopenDate=Last reopening
+ReopenedBy=reopened by
+InvoiceClosureHistory=Closure history
+InvoiceClosureSource=Source
+InvoiceClosureRequestId=Request id
+InvoiceClosureActionClose=Closure
+InvoiceClosureActionReopen=Reopening
+
+# Agenda
+InvoiceClosureAgendaClose=Invoice %s closed (business status)
+InvoiceClosureAgendaReopen=Closure of invoice %s reopened (business status)
+
+# Errors
+InvoiceMustBePaidBeforeClosure=The invoice must be paid before its closure.
+InvoiceMustBeFullyPaidBeforeClosure=The invoice must be fully paid (zero remain to pay) before its closure.
+InvoiceRemainToPayNotZero=The remain to pay of this invoice is not zero.
+InvoiceAlreadyClosed=This invoice is already closed.
+InvoiceNotClosedError=This invoice is not closed.
+NoPermissionToCloseInvoice=You do not have the permission to close this invoice.
+NoPermissionToReopenInvoice=You do not have the permission to reopen the closure of this invoice.
+InvoiceClosureErrInvoiceNotFound=Invoice not found.
+InvoiceClosureErrNotCustomerInvoice=This operation is only possible on a customer invoice.
+InvoiceClosureErrEntityMismatch=This invoice does not belong to the current entity.
+InvoiceClosureErrNoInvoiceReadRight=You do not have access to this invoice.
+InvoiceClosureErrAbandoned=An abandoned invoice cannot be closed.
+InvoiceClosureReopenDisabled=Reopening of the closure is disabled in the module setup.
+InvoiceClosureCloseNoteRequired=The closure note is mandatory.
+InvoiceClosureReopenNoteRequired=The reopen note is mandatory.
+InvoiceClosureErrInvalidRequestId=The request id is invalid (allowed characters: letters, digits, dot, dash, underscore; 64 characters maximum).
+InvoiceClosureErrTechnical=Technical error during the closure operation. Check the logs.
+InvoiceClosureLockedError=Invoice %s is closed and locked: this operation is not allowed.
+
+# Setup
+SetupINVOICECLOSURE_REQUIRE_ZERO_REMAIN=Require a remain to pay equal to zero
+SetupINVOICECLOSURE_REQUIRE_ZERO_REMAINHelp=If yes, only a fully paid invoice (zero remain to pay) can be closed. If no, any invoice with the standard status "Paid" can be closed, including invoices classified paid with a reason (discount, loss, etc.).
+SetupINVOICECLOSURE_LOCK_CLOSED_INVOICES=Lock closed invoices
+SetupINVOICECLOSURE_LOCK_CLOSED_INVOICESHelp=If yes, modifications (header, lines, deletion, back to unpaid, payment deletion) of a closed invoice are blocked server side, except for users with the "Force" permission.
+SetupINVOICECLOSURE_ALLOW_REOPEN=Allow reopening
+SetupINVOICECLOSURE_ALLOW_REOPENHelp=If yes, authorized users can reopen the closure of an invoice (business status only).
+SetupINVOICECLOSURE_REQUIRE_CLOSE_NOTE=Mandatory closure note
+SetupINVOICECLOSURE_REQUIRE_CLOSE_NOTEHelp=If yes, a note must be entered when closing.
+SetupINVOICECLOSURE_REQUIRE_REOPEN_NOTE=Mandatory reopen note
+SetupINVOICECLOSURE_REQUIRE_REOPEN_NOTEHelp=If yes, a note must be entered when reopening.
+SetupINVOICECLOSURE_CREATE_AGENDA_EVENT=Create an event in the agenda
+SetupINVOICECLOSURE_CREATE_AGENDA_EVENTHelp=If yes, every closure and reopening creates an automatic event in the Dolibarr agenda (if the Agenda module is enabled).
+SetupINVOICECLOSURE_SHOW_IN_INVOICE_LIST=Show the closure in the invoice list
+SetupINVOICECLOSURE_SHOW_IN_INVOICE_LISTHelp=If yes, a "Closure" column and dedicated filters are added to the customer invoice list.
+SetupINVOICECLOSURE_SHOW_BADGE=Show the badge on the invoice card
+SetupINVOICECLOSURE_SHOW_BADGEHelp=If yes, a "Closed" badge is displayed next to the standard status in the banner of the invoice card.

@@ -15,6 +15,7 @@ développements sur mesure pour la gestion d'une activité commerciale en
 - [Documentation](#documentation)
 - [Licence](#licence)
 
+
 ## Fonctionnalités sur mesure
 
 En plus des fonctions standard de Dolibarr (tiers, produits, stock, facturation,

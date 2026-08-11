@@ -1,0 +1,80 @@
+# Copyright (C) 2026 InvoiceClosure module
+# Fichier de langue française du module Clôture des factures
+
+# Module
+ModuleInvoiceClosureName=Clôture des factures
+ModuleInvoiceClosureDesc=Ajoute un statut métier « Clôturée » après le statut standard « Payée » d'une facture client, sans modifier le cœur de Dolibarr.
+InvoiceClosure=Clôture des factures
+InvoiceClosureColumn=Clôture
+InvoiceClosureSetup=Configuration - Clôture des factures
+InvoiceClosureSetupDesc=Paramètres du statut métier « Clôturée » des factures clients. Le statut standard Dolibarr « Payée » n'est jamais modifié par ce module.
+InvoiceClosureAbout=À propos - Clôture des factures
+InvoiceClosureAboutWorkflow=Workflow géré : Brouillon → Validée → Payée → Clôturée. La clôture est un statut métier complémentaire : la facture reste « Payée » pour Dolibarr.
+InvoiceClosureApiEndpoint=Point d'entrée API REST
+
+# Actions et boutons
+CloseInvoice=Clôturer
+ReopenInvoiceClosure=Rouvrir la clôture
+ConfirmCloseInvoice=Confirmer la clôture de cette facture ? Son statut Dolibarr restera « Payée ».
+ConfirmReopenInvoice=Confirmer la réouverture de cette facture ? Elle repassera au statut métier « Payée » sans redevenir impayée.
+InvoiceClosureSuccessful=La facture a été clôturée avec succès.
+InvoiceClosureReopened=La clôture de la facture a été rouverte.
+
+# Statuts et affichage
+InvoiceClosed=Clôturée
+InvoiceNotClosed=Non clôturée
+InvoiceClosedBadgeHelp=Statut métier du module Clôture des factures. Le statut standard Dolibarr reste « Payée ».
+InvoiceClosureBusinessStatus=Statut métier (clôture)
+ClosureDate=Date de clôture
+ClosedBy=Clôturée par
+ClosureNote=Note de clôture
+ReopenNote=Note de réouverture
+LastReopenDate=Dernière réouverture
+ReopenedBy=rouverte par
+InvoiceClosureHistory=Historique de clôture
+InvoiceClosureSource=Source
+InvoiceClosureRequestId=Identifiant de requête
+InvoiceClosureActionClose=Clôture
+InvoiceClosureActionReopen=Réouverture
+
+# Agenda
+InvoiceClosureAgendaClose=Facture %s clôturée (statut métier)
+InvoiceClosureAgendaReopen=Clôture de la facture %s rouverte (statut métier)
+
+# Erreurs
+InvoiceMustBePaidBeforeClosure=La facture doit être payée avant sa clôture.
+InvoiceMustBeFullyPaidBeforeClosure=La facture doit être entièrement payée (reste à payer nul) avant sa clôture.
+InvoiceRemainToPayNotZero=Le reste à payer de cette facture n'est pas égal à zéro.
+InvoiceAlreadyClosed=Cette facture est déjà clôturée.
+InvoiceNotClosedError=Cette facture n'est pas clôturée.
+NoPermissionToCloseInvoice=Vous ne disposez pas du droit de clôturer cette facture.
+NoPermissionToReopenInvoice=Vous ne disposez pas du droit de rouvrir la clôture de cette facture.
+InvoiceClosureErrInvoiceNotFound=Facture introuvable.
+InvoiceClosureErrNotCustomerInvoice=Cette opération n'est possible que sur une facture client.
+InvoiceClosureErrEntityMismatch=Cette facture n'appartient pas à l'entité courante.
+InvoiceClosureErrNoInvoiceReadRight=Vous n'avez pas accès à cette facture.
+InvoiceClosureErrAbandoned=Une facture abandonnée ne peut pas être clôturée.
+InvoiceClosureReopenDisabled=La réouverture de la clôture est désactivée dans la configuration du module.
+InvoiceClosureCloseNoteRequired=La note de clôture est obligatoire.
+InvoiceClosureReopenNoteRequired=La note de réouverture est obligatoire.
+InvoiceClosureErrInvalidRequestId=L'identifiant de requête est invalide (caractères autorisés : lettres, chiffres, point, tiret, tiret bas ; 64 caractères maximum).
+InvoiceClosureErrTechnical=Erreur technique lors de l'opération de clôture. Consultez les journaux.
+InvoiceClosureLockedError=La facture %s est clôturée et verrouillée : cette opération n'est pas autorisée.
+
+# Configuration
+SetupINVOICECLOSURE_REQUIRE_ZERO_REMAIN=Exiger un reste à payer égal à zéro
+SetupINVOICECLOSURE_REQUIRE_ZERO_REMAINHelp=Si oui, seule une facture totalement payée (reste à payer nul) peut être clôturée. Si non, toute facture au statut standard « Payée » peut être clôturée, y compris classée payée avec un motif (escompte, perte, etc.).
+SetupINVOICECLOSURE_LOCK_CLOSED_INVOICES=Verrouiller les factures clôturées
+SetupINVOICECLOSURE_LOCK_CLOSED_INVOICESHelp=Si oui, les modifications (en-tête, lignes, suppression, remise en impayé, suppression de paiement) d'une facture clôturée sont bloquées côté serveur, sauf pour les utilisateurs disposant du droit « Forcer ».
+SetupINVOICECLOSURE_ALLOW_REOPEN=Autoriser la réouverture
+SetupINVOICECLOSURE_ALLOW_REOPENHelp=Si oui, les utilisateurs autorisés peuvent rouvrir la clôture d'une facture (statut métier uniquement).
+SetupINVOICECLOSURE_REQUIRE_CLOSE_NOTE=Note de clôture obligatoire
+SetupINVOICECLOSURE_REQUIRE_CLOSE_NOTEHelp=Si oui, une note doit obligatoirement être saisie lors de la clôture.
+SetupINVOICECLOSURE_REQUIRE_REOPEN_NOTE=Note de réouverture obligatoire
+SetupINVOICECLOSURE_REQUIRE_REOPEN_NOTEHelp=Si oui, une note doit obligatoirement être saisie lors de la réouverture.
+SetupINVOICECLOSURE_CREATE_AGENDA_EVENT=Créer un événement dans l'agenda
+SetupINVOICECLOSURE_CREATE_AGENDA_EVENTHelp=Si oui, chaque clôture et chaque réouverture crée un événement automatique dans l'agenda Dolibarr (si le module Agenda est actif).
+SetupINVOICECLOSURE_SHOW_IN_INVOICE_LIST=Afficher la clôture dans la liste des factures
+SetupINVOICECLOSURE_SHOW_IN_INVOICE_LISTHelp=Si oui, une colonne « Clôture » et des filtres dédiés sont ajoutés à la liste des factures clients.
+SetupINVOICECLOSURE_SHOW_BADGE=Afficher le badge sur la fiche facture
+SetupINVOICECLOSURE_SHOW_BADGEHelp=Si oui, un badge « Clôturée » est affiché à côté du statut standard dans la bannière de la fiche facture.
