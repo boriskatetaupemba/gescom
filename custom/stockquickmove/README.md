@@ -16,6 +16,9 @@ Le formulaire est réservé aux produits physiques autorisés à la vente (`tose
 2. Activer les modules **Produits** et **Stocks**.
 3. Activer **Mouvements de stock rapides** depuis Configuration > Modules/Applications.
 
+Lors d'une mise à jour depuis la version 1.0.0, désactiver puis réactiver le module
+une fois afin que Dolibarr recrée son entrée dans le menu.
+
 Le module porte l'identifiant `4940000` et dépend de `modProduct` et `modStock`.
 
 ## Accès
@@ -23,15 +26,15 @@ Le module porte l'identifiant `4940000` et dépend de `modProduct` et `modStock`
 Le formulaire est disponible :
 
 - dans le menu Produits > Entrepôts > Mouvement rapide ;
-- depuis le bouton « Nouveau mouvement rapide » affiché sur la liste des mouvements d'un entrepôt.
+- depuis le bouton « Nouveau mouvement rapide » affiché sur la liste globale des mouvements ou sur celle d'un entrepôt.
 
-Les deux accès sont réservés aux utilisateurs internes disposant des droits natifs de lire le stock (`stock.lire`) et de créer des mouvements (`stock.mouvement.creer`). Le bouton est injecté par le hook `addMoreActionsButtons` dans le contexte `stockmovementlist`.
+Les deux accès sont réservés aux utilisateurs internes disposant des droits natifs de lire le stock (`stock.lire`) et de créer des mouvements (`stock.mouvement.creer`). Les boutons sont injectés par les hooks `printFieldPreListTitle` et `addMoreActionsButtons` dans le contexte `stockmovementlist`.
 
 ## Fichiers principaux
 
 - `quickmovement.php` : formulaire et traitement des mouvements ;
-- `core/modules/modStockQuickMove.class.php` : descripteur, dépendances, hook et menu ;
-- `class/actions_stockquickmove.class.php` : bouton ajouté à la liste native ;
+- `core/modules/modStockQuickMove.class.php` : descripteur, dépendances, hooks et menu ;
+- `class/actions_stockquickmove.class.php` : boutons ajoutés aux listes globale et par entrepôt ;
 - `langs/fr_FR/stockquickmove.lang` et `langs/en_US/stockquickmove.lang` : traductions.
 
 Le lien **Annuler** du formulaire retourne explicitement vers `/product/stock/movement_list.php`.

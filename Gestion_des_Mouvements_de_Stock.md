@@ -9,8 +9,8 @@ Faire évoluer la page de transfert rapide afin qu'elle permette non seulement l
 > Le formulaire unique gère les trois types de mouvement (Transfert / Entrée / Sortie) et a été enrichi de plusieurs améliorations d'ergonomie et de fonctionnalités à valeur ajoutée — voir les sections « Améliorations de l'interface (ergonomie) », « Fonctionnalités avancées » et « Détails techniques d'implémentation ».
 
 Le module **StockQuickMove** doit être activé. Il ajoute une entrée sous
-Produits > Entrepôts et un bouton sur les listes de mouvements associées à un
-entrepôt, sans modifier `product/stock/movement_list.php`.
+Produits > Entrepôts et un bouton sur la liste globale des mouvements ainsi que
+sur les listes associées à un entrepôt, sans modifier `product/stock/movement_list.php`.
 
 ---
 
@@ -153,7 +153,7 @@ Fonctionnalités ajoutées au-delà de la spécification initiale pour fiabilise
 ## Détails techniques d'implémentation
 
 - **Page du module** : `custom/stockquickmove/quickmovement.php` (UI, styles préfixés `.trs-`, logique JavaScript en IIFE, et endpoint AJAX intégré).
-- **Descripteur et hook** : `custom/stockquickmove/core/modules/modStockQuickMove.class.php` et `custom/stockquickmove/class/actions_stockquickmove.class.php`.
+- **Descripteur et hooks** : `custom/stockquickmove/core/modules/modStockQuickMove.class.php` et `custom/stockquickmove/class/actions_stockquickmove.class.php`.
 - **Mécanismes standard Dolibarr** :
   - Transfert : backend existant **conservé sans modification** (`MouvementStock::_create`).
   - Entrée : `MouvementStock::reception()` (met à jour le PMP).

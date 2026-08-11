@@ -59,7 +59,7 @@ rajouter une méthode sous la base `/invoices`, ou d'injecter une propriété da
   entrepôt et ajout optionnel des informations InvoiceClosure.
 - **InvoiceClosure** : reste la source métier canonique du statut et conserve
   ses routes `/invoiceclosureapi`.
-- **StockQuickMove 1.0.0** : page autonome, menu Produits > Entrepôts et hook
+- **StockQuickMove 1.0.1** : page autonome, menu Produits > Entrepôts et hooks
   `stockmovementlist` sans remplacement des actions natives.
 
 Après déploiement, activer StockQuickMove, réactiver BankAudit et InvoicePlus,

@@ -42,7 +42,7 @@ class modStockQuickMove extends DolibarrModules
 		$this->descriptionlong = 'ModuleStockQuickMoveDescLong';
 		$this->editor_name = 'StockQuickMove';
 		$this->editor_url = '';
-		$this->version = '1.0.0';
+		$this->version = '1.0.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'stock';
 
@@ -98,11 +98,11 @@ class modStockQuickMove extends DolibarrModules
 			'titre' => 'StockQuickMoveMenu',
 			'mainmenu' => 'products',
 			'leftmenu' => 'stockquickmove_quickmovement',
-			'url' => '/custom/stockquickmove/quickmovement.php',
+			'url' => '/stockquickmove/quickmovement.php',
 			'langs' => 'stockquickmove@stockquickmove',
 			'position' => 1100,
 			'enabled' => 'isModEnabled("stockquickmove")',
-			'perms' => '$user->hasRight("stock", "mouvement", "creer")',
+			'perms' => '$user->hasRight("stock", "lire") && $user->hasRight("stock", "mouvement", "creer")',
 			'target' => '',
 			'user' => 0,
 		);
