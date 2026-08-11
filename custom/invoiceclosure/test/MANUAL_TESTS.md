@@ -21,7 +21,7 @@ payée disponible.
 | 9 | Double clôture même request_id | Rejouer le même POST | 200, `already_closed=true`, PAS de nouvelle ligne d'historique, date initiale conservée | Script API étape 3 + PHPUnit `testCloseIdempotency` |
 | 10 | Double clôture autre request_id | POST avec un request_id différent | 200, `already_closed=true` (comportement documenté) | Script API étape 4 + PHPUnit |
 | 11 | Réouverture depuis l'interface | Facture clôturée → **Rouvrir la clôture** → note → Oui | Badge retiré, statut Dolibarr toujours « Payée » | Manuel |
-| 12 | Réouverture depuis l'API | `POST /invoices/{id}/reopen` | 200, `business_status=0`, statut Dolibarr inchangé | Script API étape 7 |
+| 12 | Réouverture depuis l'API | `POST /invoiceclosureapi/invoices/{id}/reopen` | 200, `business_status=0`, statut Dolibarr inchangé | Script API étape 7 |
 | 13 | Historique complet | Clôturer, rouvrir, re-clôturer puis ouvrir la page Historique | 3 lignes : CLOSE, REOPEN, CLOSE avec dates/utilisateurs/notes | PHPUnit `testReopenAndHistory` |
 | 14 | Badge sur la fiche | Fiche d'une facture clôturée | Badge « Clôturée » à côté du statut « Payée » dans la bannière + bloc d'infos (date, par, note) | Manuel |
 | 15 | Colonne dans la liste | Liste des factures clients | Colonne « Clôture » : badge + date + utilisateur pour les clôturées, « Non clôturée » sinon | Manuel |

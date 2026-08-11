@@ -1,0 +1,8 @@
+# StockQuickMove - Français
+
+ModuleStockQuickMoveName=Mouvements de stock rapides
+ModuleStockQuickMoveDesc=Saisie rapide des entrées, sorties et transferts de stock
+ModuleStockQuickMoveDescLong=Ajoute un formulaire rapide de mouvement de stock sans modifier les fichiers du cœur de Dolibarr.
+StockQuickMoveMenu=Mouvement rapide
+StockQuickMoveButton=Nouveau mouvement rapide
+

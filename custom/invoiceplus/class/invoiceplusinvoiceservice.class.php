@@ -33,6 +33,22 @@ use Luracast\Restler\RestException;
 class InvoicePlusNativeInvoicesApi extends Invoices
 {
 	/**
+	 * Expose Dolibarr's protected resource check to the module service.
+	 *
+	 * @param string $resource     Resource type
+	 * @param int    $resourceId   Resource id
+	 * @param string $dbTableName  Resource table
+	 * @param string $feature2     Optional second-level feature
+	 * @param string $dbtKeyField  Third-party foreign-key field
+	 * @param string $dbtSelect    Resource primary-key field
+	 * @return bool                True when access is allowed
+	 */
+	public static function checkResourceAccess($resource, $resourceId = 0, $dbTableName = '', $feature2 = '', $dbtKeyField = 'fk_soc', $dbtSelect = 'rowid')
+	{
+		return parent::_checkAccessToResource($resource, $resourceId, $dbTableName, $feature2, $dbtKeyField, $dbtSelect);
+	}
+
+	/**
 	 * Apply the native API properties filter.
 	 *
 	 * @param Object $object     Cleaned native invoice object
@@ -115,7 +131,7 @@ class InvoicePlusInvoiceService
 			throw new RestException(403, 'Access forbidden.');
 		}
 
-		if (!DolibarrApi::_checkAccessToResource('stock', (int) $warehouse->id, 'entrepot')) {
+		if (!InvoicePlusNativeInvoicesApi::checkResourceAccess('stock', (int) $warehouse->id, 'entrepot')) {
 			throw new RestException(403, 'Access forbidden.');
 		}
 	}
@@ -146,21 +162,8 @@ class InvoicePlusInvoiceService
 
 		$conditionSql = $this->buildInvoiceConditions((int) $warehouseId, $options);
 		$isClosureFilter = in_array($options['status'], array('closed', 'paid_not_closed'), true);
-		if ($isClosureFilter && !$this->isInvoiceClosureModuleEnabled()) {
-			throw new RestException(400, 'The status '.$options['status'].' requires the InvoiceClosure module.');
-		}
-
 		if ($isClosureFilter) {
-			$sql = 'SELECT t.rowid FROM '.MAIN_DB_PREFIX.'facture AS t';
-			$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'facture_extrafields AS ef ON (ef.fk_object = t.rowid)';
-			$sql .= $conditionSql;
-			$sql .= $this->db->order($sortfield, $sortorder);
-			$allIds = $this->fetchIds($sql);
-			$allIds = $this->filterIdsByClosureStatus($allIds, $options['status']);
-			$total = count($allIds);
-			$ids = array_slice($allIds, $page * $limit, $limit);
-
-			return array('ids' => $ids, 'total' => $total, 'page' => $page, 'limit' => $limit);
+			$conditionSql .= $this->buildClosureStatusCondition($options['status']);
 		}
 
 		$countSql = 'SELECT COUNT(DISTINCT t.rowid) AS invoice_count FROM '.MAIN_DB_PREFIX.'facture AS t';
@@ -221,7 +224,8 @@ class InvoicePlusInvoiceService
 		$options = $this->applyOptionDefaults($options);
 
 		// Public native API method: payment values, contacts, linked objects,
-		// online payment URL, access checks, cleanup and InvoiceClosure enrichment.
+		// online payment URL, access checks and cleanup. InvoiceClosure enrichment
+		// is added below by this custom service, after the native response exists.
 		// Native cleanup deliberately unsets internal Facture properties. A fresh
 		// native API object per invoice is therefore required for safe list usage.
 		$nativeInvoicesApi = new InvoicePlusNativeInvoicesApi();
@@ -240,7 +244,7 @@ class InvoicePlusInvoiceService
 			(bool) $options['warehouse_lines_only']
 		);
 
-		$response = $this->enrichWithClosureData($response);
+		$response = $this->enrichWithClosureData($response, (int) $invoiceId);
 
 		if (getDolGlobalInt('INVOICEPLUS_ADD_WAREHOUSE_METADATA', 1)) {
 			$response->invoiceplus_warehouse_filter = array(
@@ -284,19 +288,100 @@ class InvoicePlusInvoiceService
 	}
 
 	/**
-	 * Preserve the native closure block or remove it when explicitly configured.
+	 * Add InvoiceClosure data without modifying Dolibarr's native Invoices API.
 	 *
-	 * The native Invoices API installed in Dolibarr 20.0.4 owns the exact format.
-	 * InvoicePlus deliberately does not rebuild that data.
-	 *
-	 * @param Object $response Native response
-	 * @return Object          Response respecting InvoicePlus configuration
+	 * @param Object $response  Native response
+	 * @param int    $invoiceId Known invoice id, or 0 to read it from the response
+	 * @return Object           Response respecting InvoicePlus configuration
 	 */
-	public function enrichWithClosureData($response)
+	public function enrichWithClosureData($response, $invoiceId = 0)
 	{
+		global $langs;
+
+		if (!is_object($response)) {
+			return $response;
+		}
 		if (!getDolGlobalInt('INVOICEPLUS_LOAD_CLOSURE_DATA', 1)) {
 			unset($response->invoiceclosure);
+			return $response;
 		}
+		if (!$this->isInvoiceClosureModuleEnabled()) {
+			unset($response->invoiceclosure);
+			return $response;
+		}
+		if (empty($this->user) || !$this->user->hasRight('invoiceclosure', 'read')) {
+			unset($response->invoiceclosure);
+			return $response;
+		}
+		if (!dol_include_once('/invoiceclosure/class/invoiceclosure.class.php')) {
+			dol_syslog(__METHOD__.' unable to load InvoiceClosure business class', LOG_ERR);
+			unset($response->invoiceclosure);
+			return $response;
+		}
+
+		$invoiceId = (int) $invoiceId;
+		if ($invoiceId <= 0 && !empty($response->id)) {
+			$invoiceId = (int) $response->id;
+		}
+		if ($invoiceId <= 0) {
+			unset($response->invoiceclosure);
+			return $response;
+		}
+
+		$closure = new InvoiceClosure($this->db);
+		$found = $closure->fetchByInvoice($invoiceId);
+		if ($found < 0) {
+			dol_syslog(__METHOD__.' '.$closure->error, LOG_ERR);
+			unset($response->invoiceclosure);
+			return $response;
+		}
+
+		$langs->loadLangs(array('invoiceclosure@invoiceclosure'));
+		$isClosed = ($found > 0 && (int) $closure->closure_status === InvoiceClosure::STATUS_CLOSED);
+		$businessStatusCode = 'not_closed';
+		if ($isClosed) {
+			$businessStatusCode = 'closed';
+		} elseif ($found > 0 && !empty($closure->date_reopen)) {
+			$businessStatusCode = 'reopened';
+		}
+
+		$data = array(
+			'business_status' => $isClosed ? 1 : 0,
+			'business_status_code' => $businessStatusCode,
+			'business_status_label' => $isClosed ? $langs->trans('InvoiceClosed') : $langs->trans('InvoiceNotClosed'),
+			'locked' => ($isClosed && getDolGlobalInt('INVOICECLOSURE_LOCK_CLOSED_INVOICES')) ? 1 : 0,
+			'closed_at' => null,
+			'closed_at_iso' => null,
+			'closed_by' => null,
+			'closure_note' => '',
+			'reopened_at' => null,
+			'reopened_at_iso' => null,
+			'reopened_by' => null,
+			'reopen_note' => '',
+		);
+
+		if ($found > 0) {
+			if (!empty($closure->date_closure)) {
+				$data['closed_at'] = (int) $closure->date_closure;
+				$data['closed_at_iso'] = dol_print_date($closure->date_closure, 'dayhourrfc');
+				$data['closed_by'] = array(
+					'id' => (int) $closure->fk_user_closure,
+					'login' => $closure->closure_login,
+				);
+				$data['closure_note'] = $closure->closure_note;
+			}
+			if (!empty($closure->date_reopen)) {
+				$data['reopened_at'] = (int) $closure->date_reopen;
+				$data['reopened_at_iso'] = dol_print_date($closure->date_reopen, 'dayhourrfc');
+				$data['reopened_by'] = array(
+					'id' => (int) $closure->fk_user_reopen,
+					'login' => $closure->reopen_login,
+				);
+				$data['reopen_note'] = $closure->reopen_note;
+			}
+		}
+
+		$response->invoiceclosure = $data;
 
 		return $response;
 	}
@@ -624,7 +709,7 @@ class InvoicePlusInvoiceService
 	 * @return void
 	 * @throws RestException
 	 */
-	private function validateSqlFilterAliases($sqlfilters)
+	public function validateSqlFilterAliases($sqlfilters)
 	{
 		$allowedInvoiceFields = array(
 			'rowid', 'ref', 'entity', 'ref_ext', 'ref_client', 'type', 'subtype', 'fk_soc',
@@ -642,13 +727,23 @@ class InvoicePlusInvoiceService
 			'fk_multicurrency', 'multicurrency_code', 'multicurrency_tx',
 			'multicurrency_total_ht', 'multicurrency_total_tva', 'multicurrency_total_ttc',
 		);
+		$filterForValidation = trim((string) $sqlfilters);
+		if (!preg_match('/^\(.*\)$/s', $filterForValidation)) {
+			$filterForValidation = '('.$filterForValidation.')';
+		}
 		$matches = array();
-		if (preg_match_all('/\(+\s*([a-zA-Z][a-zA-Z0-9_]*)\.([a-zA-Z][a-zA-Z0-9_]*)\s*:/', $sqlfilters, $matches)) {
-			foreach ($matches[1] as $index => $alias) {
+		if (preg_match_all('/\(+\s*([a-zA-Z0-9_.]+)\s*:[<>!=a-z]+:/i', $filterForValidation, $matches)) {
+			foreach ($matches[1] as $operand) {
+				$parts = explode('.', $operand);
+				if (count($parts) !== 2) {
+					throw new RestException(400, 'Invalid sqlfilters field. Prefix invoice fields with t. and extrafields with ef.');
+				}
+				$alias = strtolower($parts[0]);
+				$field = strtolower($parts[1]);
 				if (!in_array($alias, array('t', 'ef'), true)) {
 					throw new RestException(400, 'Invalid sqlfilters alias. Only t and ef are allowed.');
 				}
-				if ($alias === 't' && !in_array($matches[2][$index], $allowedInvoiceFields, true)) {
+				if ($alias === 't' && !in_array($field, $allowedInvoiceFields, true)) {
 					throw new RestException(400, 'Invalid invoice field in sqlfilters.');
 				}
 			}
@@ -656,14 +751,13 @@ class InvoicePlusInvoiceService
 	}
 
 	/**
-	 * Filter paid invoice ids through InvoiceClosure's public API.
+	 * Build an indexed InvoiceClosure predicate before counting and paging.
 	 *
-	 * @param int[]  $ids    Candidate ids
 	 * @param string $status closed or paid_not_closed
-	 * @return int[]         Filtered ids
+	 * @return string        SQL condition beginning with AND
 	 * @throws RestException
 	 */
-	private function filterIdsByClosureStatus(array $ids, $status)
+	private function buildClosureStatusCondition($status)
 	{
 		if (!$this->isInvoiceClosureModuleEnabled()) {
 			throw new RestException(400, 'The status '.$status.' requires the InvoiceClosure module.');
@@ -676,22 +770,13 @@ class InvoicePlusInvoiceService
 			throw new RestException(500, 'Unable to load invoice closure information.');
 		}
 
-		$closure = new InvoiceClosure($this->db);
-		$wantClosed = ($status === 'closed');
-		$filtered = array();
-		foreach ($ids as $invoiceId) {
-			$closureStatus = $closure->getClosureStatus((int) $invoiceId);
-			if ($closureStatus < 0) {
-				dol_syslog(__METHOD__.' '.$closure->error, LOG_ERR);
-				throw new RestException(503, 'Unable to read invoice closure information.');
-			}
-			$isClosed = ((int) $closureStatus === InvoiceClosure::STATUS_CLOSED);
-			if (($wantClosed && $isClosed) || (!$wantClosed && !$isClosed)) {
-				$filtered[] = (int) $invoiceId;
-			}
-		}
+		$closedExists = 'EXISTS (';
+		$closedExists .= 'SELECT 1 FROM '.MAIN_DB_PREFIX.'invoiceclosure AS ic';
+		$closedExists .= ' WHERE ic.fk_facture = t.rowid AND ic.entity = t.entity';
+		$closedExists .= ' AND ic.closure_status = '.((int) InvoiceClosure::STATUS_CLOSED);
+		$closedExists .= ')';
 
-		return $filtered;
+		return $status === 'closed' ? ' AND '.$closedExists : ' AND NOT '.$closedExists;
 	}
 
 	/**

@@ -1,0 +1,8 @@
+# StockQuickMove - English
+
+ModuleStockQuickMoveName=Quick stock movements
+ModuleStockQuickMoveDesc=Quick entry, exit and transfer of stock
+ModuleStockQuickMoveDescLong=Adds a quick stock movement form without changing Dolibarr core files.
+StockQuickMoveMenu=Quick movement
+StockQuickMoveButton=New quick movement
+

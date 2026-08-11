@@ -36,7 +36,7 @@ The base `_cleanObjectDatas()` removes database handles, internal implementation
 
 `Facture::fetch()` loads standard fields, extrafields and lines. `fetch_lines()` explicitly selects and assigns `facturedet.fk_warehouse`. Amount/date/multicurrency types therefore remain those of the installed native API.
 
-## InvoiceClosure audit
+## InvoiceClosure audit and extraction
 
 Inspected custom files:
 
@@ -46,7 +46,7 @@ Inspected custom files:
 - `custom/invoiceclosure/class/actions_invoiceclosure.class.php`
 - `custom/invoiceclosure/core/triggers/interface_99_modInvoiceClosure_InvoiceClosureTriggers.class.php`
 
-The installed native `api_invoices.class.php` already enriches cleaned customer invoices through its private `_getInvoiceClosureData()`. It checks module activation and `invoiceclosure.read`, uses the public `InvoiceClosure::fetchByInvoice()` method, and adds `invoiceclosure` with:
+The previous Gescom fork enriched cleaned customer invoices through a private `_getInvoiceClosureData()` method added to the native `api_invoices.class.php`. That core customization has been removed. InvoicePlus 1.1.0 now checks module activation and `invoiceclosure.read`, uses the public `InvoiceClosure::fetchByInvoice()` method, and adds `invoiceclosure` with:
 
 - `business_status`
 - `business_status_code`
@@ -55,7 +55,7 @@ The installed native `api_invoices.class.php` already enriches cleaned customer 
 - `closed_at`, `closed_at_iso`, `closed_by`, `closure_note`
 - `reopened_at`, `reopened_at_iso`, `reopened_by`, `reopen_note`
 
-InvoicePlus does not reproduce these fields. Its native `Invoices::get()` call is the single source of truth. Closure-status filtering uses public `InvoiceClosure::getClosureStatus()` and never reads an InvoiceClosure table.
+Dolibarr remains the source of the invoice payload; InvoicePlus owns only this nested extension block. To keep filtering bounded, closure-status filters use the indexed, module-owned `invoiceclosure` table before count and pagination; response enrichment still uses public `InvoiceClosure::fetchByInvoice()`. The official `compta/facture/class/api_invoices.class.php` now matches tag 20.0.4.
 
 ## Warehouse security and SQL
 
@@ -77,7 +77,7 @@ The literal SQL is assembled with `MAIN_DB_PREFIX`; the conceptual placeholder a
 
 The supplied native API sample shows that invoices 214 through 223 have `fk_warehouse = 0` on every line. A strict `facturedet.fk_warehouse = <warehouse>` predicate therefore cannot return them, regardless of the requested warehouse id. The sample also shows `fk_account = 9` and no usable `module_source`/`pos_source` value.
 
-InvoicePlus 1.0.1 keeps a positive line warehouse authoritative. Only when no line has a positive warehouse does it try these existing relations, in order-independent `EXISTS` predicates:
+InvoicePlus 1.1.0 keeps a positive line warehouse authoritative. Only when no line has a positive warehouse does it try these existing relations, in order-independent `EXISTS` predicates:
 
 1. native `stock_mouvement` rows whose origin is the invoice;
 2. `pos_ticket -> pos_config.fk_warehouse` when PosNova is enabled;

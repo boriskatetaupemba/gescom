@@ -2,6 +2,20 @@
 
 Replace the base URL, API key, and warehouse id.
 
+## Native-compatible list with InvoiceClosure enrichment
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus?limit=100&page=0"
+```
+
+## Invoices linked to bank or cash accounts
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/byaccounts?account_ids=5,9&sortorder=DESC"
+```
+
 ## Simple search
 
 ```bash

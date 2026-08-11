@@ -971,17 +971,25 @@ if ($action == "transfert") {
 }
 
 
-if ($action != 'create') {
-	// Action bar
-	if ((empty($action) || $action == 'list')) {
-		/* bouton masqué
+// Action bar
+if ((empty($action) || $action == 'list') && $id > 0) {
+	print "<div class=\"tabsAction\">\n";
+
+	$parameters = array();
+	$reshook = $hookmanager->executeHooks('addMoreActionsButtons', $parameters, $warehouse, $action); // Note that $action and $warehouse may have been
+	// modified by hook
+	if (empty($reshook)) {
 		if ($user->hasRight('stock', 'mouvement', 'creer')) {
-			print "<div class=\"tabsAction\">\n";
-			print '<a class="butAction" href="'.DOL_URL_ROOT.'/product/stock/movement_create.php'.($id > 0 ? '?id='.(int) $id : '').'">'.$langs->trans("StockMovement").' - '.$langs->trans("Create").'</a>';
-			print '</div><br>';
+			print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$id.'&action=transfert&token='.newToken().'">'.$langs->trans("TransferStock").'</a>';
 		}
-		*/
+
+		if ($user->hasRight('stock', 'mouvement', 'creer')) {
+			print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$id.'&action=correction&token='.newToken().'">'.$langs->trans("CorrectStock").'</a>';
+		}
 	}
+
+	print '</div><br>';
+}
 
 $arrayofselected = is_array($toselect) ? $toselect : array();
 
@@ -1094,11 +1102,8 @@ if ($id > 0) {
 
 
 $newcardbutton = '';
-if ($permissiontoadd) {
-	$newcardbutton .= dolGetButtonTitle($langs->trans("StockMovement").' - '.$langs->trans("Create"), '', 'fa fa-plus-circle', DOL_URL_ROOT.'/product/stock/movement_create.php'.($id > 0 ? '?id='.(int) $id : ''), '', 1);
-}
 
-print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, 'movement', 0, $newcardbutton, '', $limit, 0, 0, 1);
+print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, 'movement', 0, '', '', $limit, 0, 0, 1);
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendStockMovement";
@@ -1695,259 +1700,9 @@ if (in_array('builddoc', array_keys($arrayofmassactions)) && ($nbtotalofrecords 
 	$genallowed = $permissiontoread;
 	$delallowed = $permissiontoadd;
 
+	print $formfile->showdocuments('massfilesarea_stock', '', $filedir, $urlsource, 0, $delallowed, '', 1, 1, 0, 48, 1, $param, $title, '', '', '', null, $hidegeneratedfilelistifempty);
 }
 
-}
-
-?>
-
-<?php if ($action == 'create' && $permissiontoadd) { ?>
-<!-- Quick Movement Form - creation page -->
-<div id="quickMovementModal" class="fichecenter" style="max-width: 700px; margin: 0 auto;">
-	<div class="fiche" style="background: white; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow-y: visible;">
-		<!-- Header -->
-		<div style="background-color: #f4f4f4; border-bottom: 1px solid #ddd; padding: 15px; border-radius: 4px 4px 0 0;">
-			<h4 style="margin: 0; color: #333; font-size: 16px; font-weight: bold;">
-				<?php echo $langs->trans("StockMovement"); ?> - <?php echo $langs->trans("Create"); ?>
-			</h4>
-		</div>
-		
-		<!-- Body -->
-		<form id="quickMovementPageForm" method="POST" action="<?php echo $_SERVER["PHP_SELF"].($id > 0 ? '?id='.(int) $id : ''); ?>">
-			<div style="padding: 20px;">
-				<input type="hidden" name="token" value="<?php echo newToken(); ?>">
-				<input type="hidden" name="id" value="<?php echo (int) $id; ?>">
-				<input type="hidden" name="action" value="createquickmovement">
-				
-				<!-- Entrepôt -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("Warehouse"); ?> <span style="color: red;">*</span>
-					</label>
-					<div style="position: relative;">
-						<input type="text" id="warehouse_search" class="flat" placeholder="<?php echo $langs->trans("SearchAWarehouse"); ?>" autocomplete="off" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-						<input type="hidden" id="warehouse_id_quick" name="warehouse_id_quick" value="">
-						<ul id="warehouse_autocomplete_list" style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ccc; border-top: none; list-style: none; padding: 0; margin: 0; z-index: 1000; display: none;"></ul>
-					</div>
-					<small style="color: #888;"><?php echo $langs->trans("StartTypingProductName"); ?></small>
-				</div>
-				
-				<!-- Produit -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("Product"); ?> <span style="color: red;">*</span>
-					</label>
-					<div style="position: relative;">
-						<input type="text" id="product_search" class="flat" placeholder="<?php echo $langs->trans("SearchAProduct"); ?>" autocomplete="off" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-						<input type="hidden" id="product_id_quick" name="product_id_quick" value="">
-						<ul id="product_autocomplete_list" style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #ccc; border-top: none; list-style: none; padding: 0; margin: 0; z-index: 1000; display: none;"></ul>
-					</div>
-					<small style="color: #888;"><?php echo $langs->trans("StartTypingProductName"); ?></small>
-				</div>
-				
-				<!-- Type de mouvement -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("Type"); ?> <span style="color: red;">*</span>
-					</label>
-					<select id="movementtype_quick" name="movementtype_quick" class="flat" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-						<option value="">-- <?php echo $langs->trans("Select"); ?> --</option>
-						<option value="0"><?php echo $langs->trans("MovementTypeExit"); ?></option>
-						<option value="1"><?php echo $langs->trans("MovementTypeEntry"); ?></option>
-					</select>
-				</div>
-				
-				<!-- Quantité -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("NumberOfUnit"); ?> <span style="color: red;">*</span>
-					</label>
-					<input type="number" id="qty_quick" name="qty_quick" class="flat" step="0.01" required placeholder="0.00" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-				</div>
-				
-				<!-- Libellé -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("Label"); ?>
-					</label>
-					<input type="text" id="label_quick" name="label_quick" class="flat" placeholder="<?php echo $langs->trans("Description"); ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-				</div>
-				
-				<!-- Prix unitaire -->
-				<div style="margin-bottom: 15px;">
-					<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">
-						<?php echo $langs->trans("UnitPurchaseValue"); ?>
-					</label>
-					<input type="number" id="unitprice_quick" name="unitprice_quick" class="flat" step="0.01" placeholder="0.00" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px;">
-				</div>
-			</div>
-			
-			<!-- Footer -->
-			<div style="background-color: #f9f9f9; border-top: 1px solid #ddd; padding: 15px; text-align: right; border-radius: 0 0 4px 4px;">
-				<a class="button button-cancel" href="<?php echo $_SERVER["PHP_SELF"].($id > 0 ? '?id='.(int) $id : ''); ?>" style="margin-right: 10px;"><?php echo $langs->trans("Cancel"); ?></a>
-				<button type="submit" class="button" style="background-color: #3498db; color: white; border: none; cursor: pointer;"><?php echo $langs->trans("Create"); ?></button>
-			</div>
-		</form>
-	</div>
-</div>
-
-<script>
-	$(document).ready(function() {
-		var searchTimeout;
-		document.getElementById('warehouse_search').focus();
-		
-		// ===== WAREHOUSE AUTOCOMPLETE =====
-		$('#warehouse_search').on('input', function() {
-			clearTimeout(searchTimeout);
-			var searchTerm = $(this).val().trim();
-			
-			if (searchTerm.length < 2) {
-				$('#warehouse_autocomplete_list').hide();
-				return;
-			}
-			
-			searchTimeout = setTimeout(function() {
-				$.ajax({
-					url: '<?php echo DOL_URL_ROOT; ?>/core/ajax/warehouses.php',
-					type: 'POST',
-					data: { 
-						action: 'search',
-						searchTerm: searchTerm,
-						maxRows: 15
-					},
-					dataType: 'json',
-					success: function(data) {
-						displayWarehouseList(data);
-					},
-					error: function() {
-						$('#warehouse_autocomplete_list').hide();
-					}
-				});
-			}, 300);
-		});
-		
-		function displayWarehouseList(data) {
-			var list = $('#warehouse_autocomplete_list');
-			list.empty();
-			
-			if (!data || data.length === 0) {
-				list.html('<li style="padding: 10px 15px; color: #888;"><?php echo $langs->trans("NoResultsFound"); ?></li>');
-			}
-			
-			data.forEach(function(warehouse) {
-				var warehouseId = warehouse.id;
-				var warehouseLabel = warehouse.label || warehouse.ref || '';
-				var warehouseRef = warehouse.ref || '';
-				
-				var listItem = $('<li></li>');
-				listItem.html('<strong>' + warehouseRef + '</strong> - ' + warehouseLabel);
-				listItem.css({
-					'padding': '10px 15px',
-					'border-bottom': '1px solid #f0f0f0',
-					'cursor': 'pointer'
-				}).hover(
-					function() { $(this).css('background-color', '#f9f9f9'); },
-					function() { $(this).css('background-color', 'white'); }
-				);
-				
-				listItem.on('click', function() {
-					$('#warehouse_id_quick').val(warehouseId);
-					$('#warehouse_search').val(warehouseRef + ' - ' + warehouseLabel);
-					list.hide();
-				});
-				
-				list.append(listItem);
-			});
-			
-			if (data.length > 0) {
-				list.show();
-			}
-		}
-		
-		// ===== PRODUCT AUTOCOMPLETE =====
-		$('#product_search').on('input', function() {
-			clearTimeout(searchTimeout);
-			var searchTerm = $(this).val().trim();
-			
-			if (searchTerm.length < 2) {
-				$('#product_autocomplete_list').hide();
-				return;
-			}
-			
-			searchTimeout = setTimeout(function() {
-				$.ajax({
-					url: '<?php echo DOL_URL_ROOT; ?>/core/ajax/products.php',
-					type: 'POST',
-					data: { 
-						action: 'search',
-						searchTerm: searchTerm,
-						maxRows: 15
-					},
-					dataType: 'json',
-					success: function(data) {
-						displayProductList(data);
-					},
-					error: function() {
-						$('#product_autocomplete_list').hide();
-					}
-				});
-			}, 300);
-		});
-		
-		function displayProductList(data) {
-			var list = $('#product_autocomplete_list');
-			list.empty();
-			
-			if (!data || data.length === 0) {
-				list.html('<li style="padding: 10px 15px; color: #888;"><?php echo $langs->trans("NoResultsFound"); ?></li>');
-			}
-			
-			data.forEach(function(product) {
-				var productId = product.id;
-				var productLabel = product.label || '';
-				var productRef = product.ref || '';
-				
-				var listItem = $('<li></li>');
-				listItem.html('<strong>' + productRef + '</strong>' + (productLabel ? ' - ' + productLabel : ''));
-				listItem.css({
-					'padding': '10px 15px',
-					'border-bottom': '1px solid #f0f0f0',
-					'cursor': 'pointer'
-				}).hover(
-					function() { $(this).css('background-color', '#f9f9f9'); },
-					function() { $(this).css('background-color', 'white'); }
-				);
-				
-				listItem.on('click', function() {
-					$('#product_id_quick').val(productId);
-					$('#product_search').val(productRef + (productLabel ? ' - ' + productLabel : ''));
-					list.hide();
-				});
-				
-				list.append(listItem);
-			});
-			
-			if (data.length > 0) {
-				list.show();
-			}
-		}
-		
-		// Hide autocomplete when clicking elsewhere
-		$(document).on('click', function(e) {
-			if (!$(e.target).closest('#warehouse_search').length && !$(e.target).closest('#warehouse_autocomplete_list').length) {
-				$('#warehouse_autocomplete_list').hide();
-			}
-			if (!$(e.target).closest('#product_search').length && !$(e.target).closest('#product_autocomplete_list').length) {
-				$('#product_autocomplete_list').hide();
-			}
-		});
-		
-	});
-</script>
-<?php } ?>
-
-<?php
 // End of page
 llxFooter();
 $db->close();
-

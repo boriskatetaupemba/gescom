@@ -4,8 +4,13 @@
 
 Faire évoluer la page de transfert rapide afin qu'elle permette non seulement les **transferts de stock** (fonctionnalité déjà implémentée), mais également la création de **mouvements d'entrée** et de **sortie de stock**.
 
-> **État : ✅ Implémenté** — Fichier `product/stock/movement_create.php`.
+> **État : ✅ Implémenté dans un module externe** — Fichier
+> `custom/stockquickmove/quickmovement.php`.
 > Le formulaire unique gère les trois types de mouvement (Transfert / Entrée / Sortie) et a été enrichi de plusieurs améliorations d'ergonomie et de fonctionnalités à valeur ajoutée — voir les sections « Améliorations de l'interface (ergonomie) », « Fonctionnalités avancées » et « Détails techniques d'implémentation ».
+
+Le module **StockQuickMove** doit être activé. Il ajoute une entrée sous
+Produits > Entrepôts et un bouton sur les listes de mouvements associées à un
+entrepôt, sans modifier `product/stock/movement_list.php`.
 
 ---
 
@@ -119,11 +124,11 @@ Fonctionnalités ajoutées au-delà de la spécification initiale pour fiabilise
 - Dès qu'un produit est sélectionné, un panneau affiche le **stock disponible** dans l'entrepôt pertinent :
   - entrepôt **source** pour un transfert ou une sortie ;
   - entrepôt **destination** pour une entrée.
-- Le **stock total** (tous entrepôts confondus) est également indiqué.
+- Le **stock total des entrepôts ouverts et visibles** dans le contexte d'entité courant est également indiqué.
 - Une valeur **≤ 0 est signalée en rouge**. Les données sont récupérées via un appel **AJAX** sans rechargement de page.
 
 ### 2. Garde-fou contre le stock négatif (sortie)
-- Lors d'une **sortie**, si le réglage Dolibarr `STOCK_ALLOW_NEGATIVE` est désactivé, le mouvement est **bloqué côté serveur** lorsque la quantité demandée dépasse le stock disponible, avec un message explicite.
+- Lors d'une **sortie**, si le réglage Dolibarr `STOCK_ALLOW_NEGATIVE_TRANSFER` est désactivé, le mouvement est **bloqué côté serveur** lorsque la quantité demandée dépasse le stock disponible, avec un message explicite.
 
 ### 3. Pré-remplissage du prix d'achat (entrée)
 - En mode **Entrée**, le champ **Prix d'achat** est pré-rempli automatiquement avec le **PMP** du produit (ou, à défaut, son **coût d'achat**), **uniquement si le champ est vide**. La valeur reste modifiable.
@@ -137,7 +142,7 @@ Fonctionnalités ajoutées au-delà de la spécification initiale pour fiabilise
 
 ### 6. Mini-journal des derniers mouvements
 - Les **5 derniers mouvements** enregistrés au cours de la session sont listés sous le formulaire : badge coloré selon le type, produit, trajet (source → destination), quantité et date.
-- Un lien **Effacer** permet de vider la liste.
+- Un bouton **Effacer** protégé par jeton anti-CSRF permet de vider la liste.
 
 ### 7. Validation non bloquante
 - Les contrôles de saisie n'utilisent plus de fenêtres d'alerte bloquantes : un **bandeau d'erreur en ligne** s'affiche et le **champ fautif est surligné en rouge** avec mise au focus automatique.
@@ -147,15 +152,18 @@ Fonctionnalités ajoutées au-delà de la spécification initiale pour fiabilise
 
 ## Détails techniques d'implémentation
 
-- **Fichier unique** : `product/stock/movement_create.php` (UI, styles préfixés `.trs-`, logique JavaScript en IIFE, et endpoint AJAX intégré).
+- **Page du module** : `custom/stockquickmove/quickmovement.php` (UI, styles préfixés `.trs-`, logique JavaScript en IIFE, et endpoint AJAX intégré).
+- **Descripteur et hook** : `custom/stockquickmove/core/modules/modStockQuickMove.class.php` et `custom/stockquickmove/class/actions_stockquickmove.class.php`.
 - **Mécanismes standard Dolibarr** :
   - Transfert : backend existant **conservé sans modification** (`MouvementStock::_create`).
   - Entrée : `MouvementStock::reception()` (met à jour le PMP).
   - Sortie : `MouvementStock::livraison()`.
   - Les mouvements apparaissent donc dans l'**historique des stocks**.
 - **Endpoint AJAX** `action=getproductinfo` : renvoie en JSON le stock par entrepôt, le stock total, le PMP et le coût d'achat du produit.
-- **Mini-journal** : stocké en session (`$_SESSION['trs_recent_movements']`, limité aux 5 dernières entrées) et effaçable via `?clearrecent=1`.
-- **Sécurité** : contrôle de permission `stock->mouvement->creer`, jeton anti-CSRF, échappement des sorties et requêtes filtrées par entité.
+- **Périmètre produits** : seuls les produits physiques autorisés à la vente (`tosell=1`) sans gestion de lot/série sont proposés ; les services, produits internes non commercialisables et produits à lot sont exclus du sélecteur rapide.
+- **Mini-journal** : stocké en session (`$_SESSION['trs_recent_movements']`, limité aux 5 dernières entrées) et effaçable par un POST `action=clearrecent` protégé par jeton.
+- **Sécurité** : utilisateur interne, module actif, droits `stock->lire` et `stock->mouvement->creer`, jeton anti-CSRF strict sur le POST, validation des produits/entrepôts visibles et requêtes filtrées par entité.
+- **Anti-rejeu** : après succès, une redirection POST/Redirect/GET empêche le rafraîchissement du navigateur de recréer le mouvement.
 
 ---
 

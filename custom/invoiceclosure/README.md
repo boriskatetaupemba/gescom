@@ -174,15 +174,14 @@ curl -X GET -H "DOLAPIKEY: VOTRE_CLE_API" \
 
 Les chemins exacts sont vérifiables dans l'explorateur REST après installation.
 
-### Intégration avec l'API native `/invoices` (personnalisation de ce fork)
+### Intégration avec l'API InvoicePlus (sans modification du cœur)
 
-Lorsque le module est **activé** et que l'utilisateur API possède le droit
-*Lire les informations de clôture*, toutes les routes natives qui retournent
-des factures clients (`GET /invoices`, `GET /invoices/{id}`,
-`GET /invoices/ref/{ref}`, `GET /invoices/ref_ext/{ref_ext}`,
-`GET /invoices/byaccounts`, ainsi que les retours de `PUT /invoices/{id}`,
-`validate`, `settopaid`, `settounpaid`, `settodraft`, `createfromorder`,
-`createfromcontract`, …) incluent une propriété supplémentaire :
+L'API native `/invoices` conserve désormais strictement le comportement de
+Dolibarr 20.0.4. Lorsque InvoiceClosure est **activé** et que l'utilisateur API
+possède le droit *Lire les informations de clôture*, les routes personnalisées
+`GET /invoiceplus`, `GET /invoiceplus/{id}`, `GET /invoiceplus/ref/{ref}`,
+`GET /invoiceplus/ref_ext/{ref_ext}`, `GET /invoiceplus/byaccounts` et
+`GET /invoiceplus/warehouse/{warehouse_id}` peuvent inclure la propriété :
 
 ```json
 "invoiceclosure": {
@@ -201,10 +200,11 @@ des factures clients (`GET /invoices`, `GET /invoices/{id}`,
 }
 ```
 
-Implémentation : enrichissement centralisé dans l'override
-`Invoices::_cleanObjectDatas()` de `compta/facture/class/api_invoices.class.php`
-(fichier déjà personnalisé sur cette instance — voir §7). Module désactivé ou
-droit absent → la propriété est simplement omise, comportement natif inchangé.
+Implémentation : enrichissement centralisé dans
+`custom/invoiceplus/class/invoiceplusinvoiceservice.class.php`, après création
+de la réponse par l'API native. Module désactivé ou droit absent → la propriété
+est simplement omise. Les écritures restent sur `/invoices`; le statut de
+clôture canonique reste disponible sur `/invoiceclosureapi`.
 
 ---
 
@@ -264,12 +264,10 @@ forcée est tracée en `LOG_WARNING` dans le syslog Dolibarr.
 
 ## 7. Fichiers du cœur inspectés (aucun modifié par le module)
 
-> Note propre à ce fork : `compta/facture/class/api_invoices.class.php` était
-> **déjà personnalisé** sur cette instance (route `byaccounts`). L'intégration
-> « statut de clôture dans l'API native » (§4) y a été ajoutée dans la même
-> logique. Le module lui-même reste 100 % autonome : si ce fichier est écrasé
-> par une mise à jour Dolibarr, seul l'enrichissement de l'API native disparaît,
-> le module et son API `/invoiceclosureapi` continuent de fonctionner.
+La route historique `GET /invoices/byaccounts` et l'enrichissement de
+`Invoices::_cleanObjectDatas()` ont été retirés du cœur. Leurs remplaçants se
+trouvent dans InvoicePlus. Une mise à jour Dolibarr peut donc remplacer les
+fichiers natifs sans supprimer la logique InvoiceClosure ni ses routes.
 
 - `filefunc.inc.php` (version 20.0.4), `conf/conf.php` (SGBD mysqli, préfixe)
 - `compta/facture/card.php` (contexts/hook `invoicecard`, actions, boutons, formConfirm)

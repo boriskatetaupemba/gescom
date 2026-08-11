@@ -1,7 +1,16 @@
 <?php
 /* ============================================================
- * movement_create.php — Dolibarr 20.0.4
+ * custom/stockquickmove/quickmovement.php — StockQuickMove
+ * Extracted from the former core customization for Dolibarr 20.0.4.
  * ============================================================ */
+
+$request_method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
+if (isset($_GET['action']) && $_GET['action'] === 'getproductinfo' && !defined('NOTOKENRENEWAL')) {
+    define('NOTOKENRENEWAL', '1');
+}
+if ($request_method === 'POST' && !defined('CSRFCHECK_WITH_TOKEN')) {
+    define('CSRFCHECK_WITH_TOKEN', '1');
+}
 
 $res = 0;
 if (!$res && file_exists('../../main.inc.php'))        { $res = @include '../../main.inc.php'; }
@@ -17,11 +26,19 @@ foreach (array(
     DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php',
 ) as $f) { require_once $f; }
 
+if (!isModEnabled('stockquickmove')) { accessforbidden('StockQuickMove module is disabled.'); }
+$result = restrictedArea($user, 'stock');
+if (!empty($user->socid)) { accessforbidden(); }
 if (empty($user->rights->stock->mouvement->creer)) { accessforbidden(); }
 $langs->loadLangs(array('products', 'stocks', 'errors'));
 
 $tbl_prefix = MAIN_DB_PREFIX;
-$entity_id  = (int)$conf->entity;
+$visible_product_entities = array_values(array_unique(array_map('intval', explode(',', (string) getEntity('product')))));
+$visible_stock_entities = array_values(array_unique(array_map('intval', explode(',', (string) getEntity('stock')))));
+if (empty($visible_product_entities)) { $visible_product_entities = array((int) $conf->entity); }
+if (empty($visible_stock_entities)) { $visible_stock_entities = array((int) $conf->entity); }
+$visible_product_entities_sql = implode(',', $visible_product_entities);
+$visible_stock_entities_sql = implode(',', $visible_stock_entities);
 
 // ─── Endpoint AJAX : infos produit (stock par entrepôt + PMP / coût d'achat) ───
 if (GETPOST('action', 'aZ09') === 'getproductinfo') {
@@ -29,13 +46,18 @@ if (GETPOST('action', 'aZ09') === 'getproductinfo') {
     $pid = GETPOSTINT('fk_product');
     $out = array('ok' => false, 'pmp' => 0, 'cost_price' => 0, 'stocks' => array(), 'total' => 0);
     if ($pid > 0) {
-        $rp = $db->query("SELECT pmp, cost_price FROM ".$tbl_prefix."product WHERE rowid = ".((int) $pid)." AND entity IN (".getEntity('product').")");
-        if ($rp && ($op = $db->fetch_object($rp))) {
+        $product_info = new Product($db);
+        if (
+            $product_info->fetch($pid) > 0
+            && in_array((int) $product_info->entity, $visible_product_entities, true)
+            && (int) $product_info->type === Product::TYPE_PRODUCT
+            && !empty($product_info->status)
+            && empty($product_info->status_batch)
+        ) {
             $out['ok'] = true;
-            $out['pmp'] = (float) $op->pmp;
-            $out['cost_price'] = (float) $op->cost_price;
-            $db->free($rp);
-            $rs = $db->query("SELECT fk_entrepot, reel FROM ".$tbl_prefix."product_stock WHERE fk_product = ".((int) $pid));
+            $out['pmp'] = (float) $product_info->pmp;
+            $out['cost_price'] = (float) $product_info->cost_price;
+            $rs = $db->query("SELECT ps.fk_entrepot, ps.reel FROM ".$tbl_prefix."product_stock AS ps INNER JOIN ".$tbl_prefix."entrepot AS e ON e.rowid = ps.fk_entrepot WHERE ps.fk_product = ".((int) $pid)." AND e.statut IN (1, 2) AND e.entity IN (".$visible_stock_entities_sql.")");
             if ($rs) {
                 $tot = 0;
                 while ($os = $db->fetch_object($rs)) {
@@ -52,14 +74,14 @@ if (GETPOST('action', 'aZ09') === 'getproductinfo') {
 }
 
 // ─── Effacement du mini-journal de session ───
-if (GETPOSTINT('clearrecent')) {
+if ($request_method === 'POST' && GETPOST('action', 'aZ09') === 'clearrecent') {
     unset($_SESSION['trs_recent_movements']);
     header('Location: '.$_SERVER['PHP_SELF']);
     exit;
 }
 
 $list_entrepots = array();
-$r = $db->query("SELECT rowid, ref, description FROM ".$tbl_prefix."entrepot WHERE statut = 1 AND entity = ".$entity_id." ORDER BY ref ASC");
+$r = $db->query("SELECT rowid, ref, description FROM ".$tbl_prefix."entrepot WHERE statut IN (1, 2) AND entity IN (".$visible_stock_entities_sql.") ORDER BY ref ASC");
 if ($r) {
     while ($o = $db->fetch_object($r)) {
         $lbl = trim($o->ref.((!empty($o->description)) ? ' — '.$o->description : ''));
@@ -69,7 +91,7 @@ if ($r) {
 }
 
 $list_products = array();
-$r2 = $db->query("SELECT rowid, ref, label FROM ".$tbl_prefix."product WHERE tosell = 1 AND entity = ".$entity_id." ORDER BY ref ASC");
+$r2 = $db->query("SELECT rowid, ref, label FROM ".$tbl_prefix."product WHERE tosell = 1 AND fk_product_type = 0 AND tobatch = 0 AND entity IN (".$visible_product_entities_sql.") ORDER BY ref ASC");
 if ($r2) {
     while ($o = $db->fetch_object($r2)) {
         $list_products[] = array('id' => (int)$o->rowid, 'ref' => $o->ref, 'label' => $o->label);
@@ -93,7 +115,33 @@ $error = 0; $message = ''; $msgtype = '';
 $msg_prod = $msg_qty = $msg_src = $msg_dst = $msg_code = $msg_date = '';
 $msg_label = $msg_price = $msg_type = '';
 
-if ($action === 'transfer') {
+// Success flash loaded after the POST/Redirect/GET cycle. This prevents a
+// browser refresh from replaying the stock movement.
+if ($request_method === 'GET' && !empty($_SESSION['stockquickmove_flash']) && is_array($_SESSION['stockquickmove_flash'])) {
+    $flash = $_SESSION['stockquickmove_flash'];
+    unset($_SESSION['stockquickmove_flash']);
+    $movement_type = isset($flash['movement_type']) && in_array($flash['movement_type'], array('transfer', 'entry', 'exit'), true) ? $flash['movement_type'] : 'transfer';
+    $fk_product = 0;
+    $fk_entrepot_s = isset($flash['fk_entrepot_source']) ? (int) $flash['fk_entrepot_source'] : 0;
+    $fk_entrepot_d = isset($flash['fk_entrepot_destination']) ? (int) $flash['fk_entrepot_destination'] : 0;
+    $qty = '';
+    $date_mouv_str = isset($flash['date_mouvement']) ? (string) $flash['date_mouvement'] : '';
+    $label_input = isset($flash['label_input']) ? (string) $flash['label_input'] : '';
+    $prix_raw = '';
+    $prix_achat = '';
+    $msgtype = 'ok';
+    $msg_prod = isset($flash['msg_prod']) ? (string) $flash['msg_prod'] : '';
+    $msg_qty = isset($flash['msg_qty']) ? (string) $flash['msg_qty'] : '';
+    $msg_src = isset($flash['msg_src']) ? (string) $flash['msg_src'] : '';
+    $msg_dst = isset($flash['msg_dst']) ? (string) $flash['msg_dst'] : '';
+    $msg_code = isset($flash['msg_code']) ? (string) $flash['msg_code'] : '';
+    $msg_date = isset($flash['msg_date']) ? (string) $flash['msg_date'] : '';
+    $msg_label = isset($flash['msg_label']) ? (string) $flash['msg_label'] : '';
+    $msg_price = isset($flash['msg_price']) ? (string) $flash['msg_price'] : '';
+    $msg_type = isset($flash['msg_type']) ? (string) $flash['msg_type'] : '';
+}
+
+if ($request_method === 'POST' && $action === 'transfer') {
     // Validation commune à tous les types de mouvement
     if (!$error && empty($fk_product)) { $error++; $message = 'Veuillez sélectionner un produit.'; $msgtype = 'error'; }
 
@@ -115,41 +163,52 @@ if ($action === 'transfer') {
     // Quantité (commune à tous les types)
     if (!$error && ($qty <= 0 || !is_numeric($qty))) { $error++; $message = 'La quantité doit être > 0.'; $msgtype = 'error'; }
 
-    // Date : l'input est de type "date" (YYYY-MM-DD), pas datetime-local
-    // On utilise le fuseau horaire du serveur pour éviter le décalage d'un jour
-    $ts_mouv = dol_now();
-    if (!empty($date_mouv_str)) {
-        // Format reçu : "YYYY-MM-DD"
-        // On construit midi heure locale pour éviter tout décalage DST
-        $dn = $date_mouv_str.' 12:00:00';
-        // On force l'interprétation en heure locale (pas UTC)
-        $tp = strtotime($dn);
-        if ($tp !== false && $tp > 0) { $ts_mouv = $tp; }
+    // Date stricte YYYY-MM-DD, fixée à midi dans le fuseau du serveur pour
+    // éviter un décalage de jour lors d'une transition DST.
+    $movement_date = DateTime::createFromFormat('!Y-m-d', (string) $date_mouv_str);
+    $movement_date_errors = DateTime::getLastErrors();
+    $valid_movement_date = $movement_date
+        && ($movement_date_errors === false || ($movement_date_errors['warning_count'] === 0 && $movement_date_errors['error_count'] === 0))
+        && $movement_date->format('Y-m-d') === (string) $date_mouv_str;
+    if (!$valid_movement_date) {
+        if (!$error) { $error++; $message = 'La date du mouvement doit respecter le format AAAA-MM-JJ.'; $msgtype = 'error'; }
+        $ts_mouv = dol_now();
+    } else {
+        $movement_date->setTime(12, 0, 0);
+        $ts_mouv = $movement_date->getTimestamp();
     }
     // Le transfert conserve son libellé fixe historique ; entrée/sortie utilisent la saisie utilisateur
     $label_mv = ($movement_type === 'transfer') ? 'Transfert' : $label_input;
     $codemouvement = 'ES-'.date('YmdHis'); // heure d'enregistrement réelle
 
     // Produit (commun à tous les types)
-    if (!$error) { $product = new Product($db); if ($product->fetch($fk_product) <= 0) { $error++; $message = 'Produit introuvable.'; $msgtype = 'error'; } }
+    if (!$error) {
+        $product = new Product($db);
+        if (
+            $product->fetch($fk_product) <= 0
+            || !in_array((int) $product->entity, $visible_product_entities, true)
+            || (int) $product->type !== Product::TYPE_PRODUCT
+            || empty($product->status)
+            || !empty($product->status_batch)
+        ) {
+            $error++; $message = 'Produit introuvable ou inaccessible.'; $msgtype = 'error';
+        }
+    }
 
     // ── TRANSFERT — backend existant conservé sans modification ───────────────
     if (!$error && $movement_type === 'transfer') {
         $entrepot_s = new Entrepot($db); $entrepot_d = new Entrepot($db);
-        if ($entrepot_s->fetch($fk_entrepot_s) <= 0) { $error++; $message = 'Entrepôt source introuvable.'; $msgtype = 'error'; }
-        elseif ($entrepot_d->fetch($fk_entrepot_d) <= 0) { $error++; $message = 'Entrepôt destination introuvable.'; $msgtype = 'error'; }
+        if ($entrepot_s->fetch($fk_entrepot_s) <= 0 || !in_array((int) $entrepot_s->entity, $visible_stock_entities, true) || !in_array((int) $entrepot_s->statut, array(Entrepot::STATUS_OPEN_ALL, Entrepot::STATUS_OPEN_INTERNAL), true)) { $error++; $message = 'Entrepôt source introuvable ou inaccessible.'; $msgtype = 'error'; }
+        elseif ($entrepot_d->fetch($fk_entrepot_d) <= 0 || !in_array((int) $entrepot_d->entity, $visible_stock_entities, true) || !in_array((int) $entrepot_d->statut, array(Entrepot::STATUS_OPEN_ALL, Entrepot::STATUS_OPEN_INTERNAL), true)) { $error++; $message = 'Entrepôt destination introuvable ou inaccessible.'; $msgtype = 'error'; }
         if (!$error) {
             $db->begin();
             $mouvS = new MouvementStock($db);
-            $id_s  = $mouvS->_create($user, $fk_product, $fk_entrepot_s, (float)$qty * -1, 0, 0, $label_mv, $codemouvement);
-            if ($id_s < 0) { $db->rollback(); $error++; $message = 'Erreur sortie : '.dol_escape_htmltag($mouvS->error); $msgtype = 'error'; }
+            $id_s  = $mouvS->_create($user, $fk_product, $fk_entrepot_s, (float)$qty * -1, 1, 0, $label_mv, $codemouvement, $ts_mouv);
+            if ($id_s <= 0) { $db->rollback(); $error++; $message = 'Erreur sortie : '.dol_escape_htmltag($mouvS->error); $msgtype = 'error'; }
             if (!$error) {
-                $dsql = $db->idate($ts_mouv);
-                $db->query("UPDATE ".$tbl_prefix."stock_mouvement SET datem='".$dsql."' WHERE rowid=".(int)$id_s);
                 $mouvD = new MouvementStock($db);
-                $id_d  = $mouvD->_create($user, $fk_product, $fk_entrepot_d, (float)$qty, 0, 0, $label_mv, $codemouvement);
-                if ($id_d < 0) { $db->rollback(); $error++; $message = 'Erreur entrée : '.dol_escape_htmltag($mouvD->error); $msgtype = 'error'; }
-                else { $db->query("UPDATE ".$tbl_prefix."stock_mouvement SET datem='".$dsql."' WHERE rowid=".(int)$id_d); }
+                $id_d  = $mouvD->_create($user, $fk_product, $fk_entrepot_d, (float)$qty, 0, 0, $label_mv, $codemouvement, $ts_mouv);
+                if ($id_d <= 0) { $db->rollback(); $error++; $message = 'Erreur entrée : '.dol_escape_htmltag($mouvD->error); $msgtype = 'error'; }
             }
             if (!$error) {
                 $db->commit();
@@ -162,7 +221,7 @@ if ($action === 'transfer') {
     // ── ENTRÉE DE STOCK — mécanisme standard Dolibarr (reception) ────────────
     if (!$error && $movement_type === 'entry') {
         $entrepot_d = new Entrepot($db);
-        if ($entrepot_d->fetch($fk_entrepot_d) <= 0) { $error++; $message = 'Entrepôt destination introuvable.'; $msgtype = 'error'; }
+        if ($entrepot_d->fetch($fk_entrepot_d) <= 0 || !in_array((int) $entrepot_d->entity, $visible_stock_entities, true) || !in_array((int) $entrepot_d->statut, array(Entrepot::STATUS_OPEN_ALL, Entrepot::STATUS_OPEN_INTERNAL), true)) { $error++; $message = 'Entrepôt destination introuvable ou inaccessible.'; $msgtype = 'error'; }
         if (!$error) {
             $db->begin();
             $mouv = new MouvementStock($db);
@@ -182,9 +241,9 @@ if ($action === 'transfer') {
     // ── SORTIE DE STOCK — mécanisme standard Dolibarr (livraison) ────────────
     if (!$error && $movement_type === 'exit') {
         $entrepot_s = new Entrepot($db);
-        if ($entrepot_s->fetch($fk_entrepot_s) <= 0) { $error++; $message = 'Entrepôt source introuvable.'; $msgtype = 'error'; }
+        if ($entrepot_s->fetch($fk_entrepot_s) <= 0 || !in_array((int) $entrepot_s->entity, $visible_stock_entities, true) || !in_array((int) $entrepot_s->statut, array(Entrepot::STATUS_OPEN_ALL, Entrepot::STATUS_OPEN_INTERNAL), true)) { $error++; $message = 'Entrepôt source introuvable ou inaccessible.'; $msgtype = 'error'; }
         // Garde-fou : interdit la sortie à découvert si le stock négatif n'est pas autorisé
-        if (!$error && !getDolGlobalInt('STOCK_ALLOW_NEGATIVE')) {
+        if (!$error && !getDolGlobalInt('STOCK_ALLOW_NEGATIVE_TRANSFER')) {
             $avail = 0;
             $rq = $db->query("SELECT reel FROM ".$tbl_prefix."product_stock WHERE fk_product = ".((int) $fk_product)." AND fk_entrepot = ".((int) $fk_entrepot_s));
             if ($rq && ($oq = $db->fetch_object($rq))) { $avail = (float) $oq->reel; $db->free($rq); }
@@ -231,12 +290,24 @@ if ($action === 'transfer') {
         ));
         $_SESSION['trs_recent_movements'] = array_slice($_SESSION['trs_recent_movements'], 0, 5);
 
-        // Réinitialisation : uniquement produit, quantité et prix d'achat.
-        // Type, date, entrepôts et libellé conservent leurs valeurs pour enchaîner rapidement.
-        $qty = '';
-        $fk_product = 0;
-        $prix_raw = '';
-        $prix_achat = '';
+        $_SESSION['stockquickmove_flash'] = array(
+            'movement_type' => $movement_type,
+            'fk_entrepot_source' => (int) $fk_entrepot_s,
+            'fk_entrepot_destination' => (int) $fk_entrepot_d,
+            'date_mouvement' => $date_mouv_str,
+            'label_input' => $label_input,
+            'msg_prod' => $msg_prod,
+            'msg_qty' => $msg_qty,
+            'msg_src' => $msg_src,
+            'msg_dst' => $msg_dst,
+            'msg_code' => $msg_code,
+            'msg_date' => $msg_date,
+            'msg_label' => $msg_label,
+            'msg_price' => $msg_price,
+            'msg_type' => $msg_type,
+        );
+        header('Location: '.$_SERVER['PHP_SELF']);
+        exit;
     }
 }
 
@@ -253,6 +324,7 @@ $dtype = $movement_type;
 $jp = json_encode(array_values($list_products),  JSON_UNESCAPED_UNICODE);
 $je = json_encode(array_values($list_entrepots), JSON_UNESCAPED_UNICODE);
 $fa = htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);
+$ajax_url = $_SERVER['PHP_SELF'].'?token='.urlencode(currentToken());
 
 llxHeader('', 'Mouvement de stock', '');
 ?>
@@ -628,6 +700,7 @@ input[type="date"].trs-fi { color-scheme: light; }
 .trs-journal-clr {
     font-size: .72rem; font-weight: 600; color: var(--t-sub);
     text-decoration: none; padding: 3px 8px; border-radius: 5px;
+    border: 0; background: transparent; cursor: pointer; font-family: inherit;
     transition: color .12s, background .12s;
 }
 .trs-journal-clr:hover { color: var(--t-red); background: #fff1f2; }
@@ -753,7 +826,7 @@ print '</div>';
 
 // Date
 print '<div class="trs-f">';
-print '<input type="date" name="date_mouvement" id="date_mouvement" class="trs-fi" value="'.htmlspecialchars($dv, ENT_QUOTES).'" placeholder=" ">';
+print '<input type="date" name="date_mouvement" id="date_mouvement" class="trs-fi" value="'.htmlspecialchars($dv, ENT_QUOTES).'" placeholder=" " required>';
 print '<label class="trs-fl" for="date_mouvement">Date du mouvement <span class="r">*</span></label>';
 print '</div>';
 
@@ -819,7 +892,7 @@ print '</div>'; // .trs-bd
 // Footer
 print '
 <div class="trs-ft">
-  <a href="movement_list.php" class="trs-btn-c">
+  <a href="'.DOL_URL_ROOT.'/product/stock/movement_list.php" class="trs-btn-c">
     <svg viewBox="0 0 24 24"><path d="M20 11H7.83l4.88-4.88A1 1 0 1011.3 4.7l-6.59 6.59a1 1 0 000 1.41l6.59 6.59a1 1 0 001.42-1.41L7.83 13H20a1 1 0 100-2z"/></svg>
     Annuler
   </a>
@@ -842,7 +915,11 @@ if (!empty($_SESSION['trs_recent_movements']) && is_array($_SESSION['trs_recent_
     print '<div class="trs-journal">';
     print '  <div class="trs-journal-h">';
     print '    <span><svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7 6.96 6.96 0 01-4.95-2.05l-1.42 1.42A9 9 0 1013 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>Derniers mouvements</span>';
-    print '    <a href="'.$fa.'?clearrecent=1" class="trs-journal-clr" title="Effacer la liste">Effacer</a>';
+    print '    <form method="POST" action="'.$fa.'" class="inline-block">';
+    print '      <input type="hidden" name="token" value="'.newToken().'">';
+    print '      <input type="hidden" name="action" value="clearrecent">';
+    print '      <button type="submit" class="trs-journal-clr" title="Effacer la liste">Effacer</button>';
+    print '    </form>';
     print '  </div>';
     print '  <ul class="trs-journal-l">';
     foreach ($_SESSION['trs_recent_movements'] as $mv) {
@@ -924,7 +1001,7 @@ print '</div>'; // .trs
 
     // ── Stock temps réel + pré-remplissage prix (via endpoint AJAX) ──
     var PINFO=null, PINFO_ID=0;
-    var AJAX_URL=<?php echo json_encode($fa); ?>;
+    var AJAX_URL=<?php echo json_encode($ajax_url); ?>;
     function fmtNum(n){
         n=Math.round((parseFloat(n)||0)*1000)/1000;
         var s=n.toLocaleString('fr-FR',{maximumFractionDigits:3});

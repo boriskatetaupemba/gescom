@@ -1,13 +1,14 @@
 # InvoicePlus REST API compatibility test (PowerShell 5.1+)
 #
 # Usage:
-# .\test_invoiceplus_api.ps1 -BaseUrl "https://dolibarr.example" -ApiKey "KEY" -WarehouseId 5 [-InvoiceId 123]
+# .\test_invoiceplus_api.ps1 -BaseUrl "https://dolibarr.example" -ApiKey "KEY" -WarehouseId 5 [-InvoiceId 123] [-AccountIds "8,9"]
 
 param(
 	[Parameter(Mandatory = $true)][string]$BaseUrl,
 	[Parameter(Mandatory = $true)][string]$ApiKey,
 	[Parameter(Mandatory = $true)][int]$WarehouseId,
-	[int]$InvoiceId = 0
+	[int]$InvoiceId = 0,
+	[string]$AccountIds = ''
 )
 
 $BaseUrl = $BaseUrl.TrimEnd('/')
@@ -24,9 +25,17 @@ function Invoke-TestRequest {
 		$code = 0
 		$body = ''
 		if ($_.Exception.Response) {
-			$code = [int]$_.Exception.Response.StatusCode.value__
-			$reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-			$body = $reader.ReadToEnd()
+			$response = $_.Exception.Response
+			$code = [int]$response.StatusCode
+			if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+				$body = [string]$_.ErrorDetails.Message
+			} elseif ($response.PSObject.Methods.Name -contains 'GetResponseStream') {
+				$reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+				$body = $reader.ReadToEnd()
+				$reader.Dispose()
+			} elseif ($response.Content -and $response.Content.PSObject.Methods.Name -contains 'ReadAsStringAsync') {
+				$body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+			}
 		}
 		return @{ Code = $code; Body = $body }
 	}
@@ -44,7 +53,27 @@ function Assert-Status {
 	}
 }
 
-$Endpoint = "$BaseUrl/api/index.php/invoiceplus/warehouse/$WarehouseId"
+$RootEndpoint = "$BaseUrl/api/index.php/invoiceplus"
+$Endpoint = "$RootEndpoint/warehouse/$WarehouseId"
+
+$result = Invoke-TestRequest "${RootEndpoint}?limit=2&page=0"
+Assert-Status 'root invoice list' 200 $result
+if ($result.Code -eq 200) {
+	$payload = $result.Body | ConvertFrom-Json
+	if ($result.Body.Trim().StartsWith('[') -and @($payload).Count -le 2) {
+		Write-Host 'PASS  root list cap' -ForegroundColor Green
+		$script:Passed++
+	} else {
+		Write-Host 'FAIL  root list cap' -ForegroundColor Red
+		$script:Failed++
+	}
+}
+
+if ($AccountIds -ne '') {
+	$encodedAccountIds = [Uri]::EscapeDataString($AccountIds)
+	$result = Invoke-TestRequest "${RootEndpoint}/byaccounts?account_ids=$encodedAccountIds&limit=2"
+	Assert-Status 'invoice list by accounts' 200 $result
+}
 
 $result = Invoke-TestRequest $Endpoint
 Assert-Status 'valid warehouse list' 200 $result
@@ -91,6 +120,32 @@ Assert-Status 'unknown warehouse' 404 $result
 if ($InvoiceId -gt 0) {
 	$native = Invoke-TestRequest "$BaseUrl/api/index.php/invoices/$InvoiceId"
 	Assert-Status 'native invoice used for comparison' 200 $native
+	$detail = Invoke-TestRequest "${RootEndpoint}/$InvoiceId"
+	Assert-Status 'InvoicePlus invoice detail' 200 $detail
+	if ($native.Code -eq 200 -and $detail.Code -eq 200) {
+		$nativeObject = $native.Body | ConvertFrom-Json
+		$detailObject = $detail.Body | ConvertFrom-Json
+		$detailObject.PSObject.Properties.Remove('invoiceclosure')
+		$nativeJson = $nativeObject | ConvertTo-Json -Depth 100 -Compress
+		$detailJson = $detailObject | ConvertTo-Json -Depth 100 -Compress
+		if ($nativeJson -eq $detailJson) {
+			Write-Host 'PASS  detail native-compatible payload' -ForegroundColor Green
+			$script:Passed++
+		} else {
+			Write-Host 'FAIL  detail payload differs from native API' -ForegroundColor Red
+			$script:Failed++
+		}
+		if ($nativeObject.ref) {
+			$encodedRef = [Uri]::EscapeDataString([string]$nativeObject.ref)
+			$byRef = Invoke-TestRequest "${RootEndpoint}/ref/$encodedRef"
+			Assert-Status 'invoice lookup by ref' 200 $byRef
+		}
+		if ($nativeObject.ref_ext) {
+			$encodedRefExt = [Uri]::EscapeDataString([string]$nativeObject.ref_ext)
+			$byRefExt = Invoke-TestRequest "${RootEndpoint}/ref_ext/$encodedRefExt"
+			Assert-Status 'invoice lookup by external ref' 200 $byRefExt
+		}
+	}
 	$plus = Invoke-TestRequest "$Endpoint`?limit=1000&loadlinkedobjects=true"
 	Assert-Status 'InvoicePlus comparison list' 200 $plus
 	if ($native.Code -eq 200 -and $plus.Code -eq 200) {
@@ -101,10 +156,11 @@ if ($InvoiceId -gt 0) {
 			$script:Failed++
 		} else {
 			$plusObject.PSObject.Properties.Remove('invoiceplus_warehouse_filter')
+			$plusObject.PSObject.Properties.Remove('invoiceclosure')
 			$nativeJson = $nativeObject | ConvertTo-Json -Depth 100 -Compress
 			$plusJson = $plusObject | ConvertTo-Json -Depth 100 -Compress
 			if ($nativeJson -eq $plusJson) {
-				Write-Host 'PASS  exact native invoice payload' -ForegroundColor Green
+				Write-Host 'PASS  native-compatible invoice payload' -ForegroundColor Green
 				$script:Passed++
 			} else {
 				Write-Host 'FAIL  native and InvoicePlus payloads differ' -ForegroundColor Red

@@ -46,11 +46,20 @@ Spécifications : [specs_module_pos.md](specs_module_pos.md)
 Documents : [reporting_banques_caisses.md](reporting_banques_caisses.md),
 [prompt_banques_caisses_dolibarr.md](prompt_banques_caisses_dolibarr.md)
 
-### Saisie rapide des mouvements de stock (`product/stock/movement_create.php`)
+### InvoiceClosure et InvoicePlus (`custom/invoiceclosure/`, `custom/invoiceplus/`)
+
+- Clôture métier, verrouillage et historique des factures clients.
+- API de clôture autonome sous `/invoiceclosureapi`.
+- API factures enrichie sous `/invoiceplus`, avec filtres par entrepôt ou
+  comptes/caisses et données de clôture optionnelles.
+- Aucun patch de `compta/facture/class/api_invoices.class.php`.
+
+### StockQuickMove — Saisie rapide (`custom/stockquickmove/`)
 
 - Formulaire unique pour **transfert / entrée / sortie**.
 - Stock en temps réel, bouton « Max », garde anti-stock négatif.
 - Journal des derniers mouvements et accessibilité (ARIA).
+- Menu et bouton ajoutés par le module, sans modification de la liste native.
 
 Document : [Gestion_des_Mouvements_de_Stock.md](Gestion_des_Mouvements_de_Stock.md)
 
@@ -61,10 +70,12 @@ Le dépôt correspond à la racine d'une installation Dolibarr (dossier *htdocs*
 ```text
 gescom/
 ├── custom/
-│   ├── bankaudit/    # Module audit banques / caisses
-│   └── posnova/      # Module POS multi-devises
-├── product/stock/    # dont movement_create.php (saisie rapide)
-├── api/              # API REST (dont login enrichi)
+│   ├── bankaudit/       # Audit banques / caisses + contexte utilisateur
+│   ├── invoiceclosure/  # Clôture métier des factures
+│   ├── invoiceplus/     # API factures enrichie
+│   ├── posnova/         # POS multi-devises
+│   └── stockquickmove/  # Saisie rapide des mouvements de stock
+├── api/              # API REST native Dolibarr
 ├── compta/           # Comptabilité, banque, facturation
 ├── conf/             # Configuration (conf.php)
 ├── install/          # Scripts d'installation et schéma SQL
@@ -92,6 +103,8 @@ Le projet s'installe comme une instance Dolibarr classique :
 4. Renseigner `conf/conf.php` (identifiants de la base, chemins).
    Un modèle est fourni : `conf/conf.php.example`.
 5. Accéder à l'application depuis le navigateur.
+6. Activer les modules personnalisés nécessaires puis désactiver/réactiver le
+   module REST si son cache de production doit être reconstruit.
 
 > Note : `conf/conf.php` (identifiants de la base de données) est versionné dans
 > ce dépôt privé. Adaptez-le à votre environnement de déploiement.
@@ -100,12 +113,15 @@ Le projet s'installe comme une instance Dolibarr classique :
 
 Développements sur mesure exposés via l'API REST de Dolibarr :
 
-- **Login enrichi** : renvoie l'entrepôt par défaut et les comptes / caisses
-  liés à l'utilisateur.
-- **Factures par compte** : `GET /invoices/byaccounts`.
+- **Contexte après login** : `GET /bankauditapi/context`, après le login natif.
+- **Factures par compte** : `GET /invoiceplus/byaccounts?account_ids=...`.
+- **Factures enrichies** : `GET /invoiceplus`, `/invoiceplus/{id}` et
+  `/invoiceplus/warehouse/{warehouse_id}`.
+- **Clôture des factures** : routes `/invoiceclosureapi`.
 - **BankAudit API** : écritures bancaires par entrepôt
   (`GET /bankauditapi/warehouse/{id}/entries`).
-- Support des catégories (tags) sur l'API des lignes bancaires.
+- La catégorie d'une ligne bancaire reste prise en charge par l'API native ;
+  l'ancienne différence dans sa PHPDoc était redondante.
 
 Document : [API_Login_Client.md](API_Login_Client.md)
 
@@ -118,6 +134,7 @@ Document : [API_Login_Client.md](API_Login_Client.md)
 | [prompt_banques_caisses_dolibarr.md](prompt_banques_caisses_dolibarr.md) | Notes module banques / caisses |
 | [Gestion_des_Mouvements_de_Stock.md](Gestion_des_Mouvements_de_Stock.md) | Saisie rapide des mouvements de stock |
 | [API_Login_Client.md](API_Login_Client.md) | API de connexion client |
+| [CORE_CUSTOMIZATIONS_AUDIT.md](CORE_CUSTOMIZATIONS_AUDIT.md) | Audit et extraction des modifications du cœur |
 
 ## Licence
 

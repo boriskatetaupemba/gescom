@@ -20,8 +20,6 @@
 use Luracast\Restler\RestException;
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/multicurrency/class/multicurrency.class.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
 
 /**
@@ -185,123 +183,8 @@ class Login
 				'code' => 200,
 				'token' => $token,
 				'entity' => $tmpuser->entity,
-				'message' => 'Welcome '.$login.($reset ? ' - Token is new' : ' - This is your token (recorded for your user). You can use it to make any REST API call, or enter it into the DOLAPIKEY field to use the Dolibarr API explorer.'),
-				'default_warehouse' => $this->getUserDefaultWarehouseInfo($tmpuser)
+				'message' => 'Welcome '.$login.($reset ? ' - Token is new' : ' - This is your token (recorded for your user). You can use it to make any REST API call, or enter it into the DOLAPIKEY field to use the Dolibarr API explorer.')
 			)
 		);
-	}
-
-	/**
-	 * Build the default warehouse information of a user, including the bank accounts / cash registers linked to it.
-	 *
-	 * The link account -> warehouse is held by the optional 'warehouse' extrafield on the bank_account element.
-	 *
-	 * @param	User	$tmpuser	User object (already fetched)
-	 * @return	array|null			Warehouse info with its accounts, or null when the user has no default warehouse
-	 */
-	private function getUserDefaultWarehouseInfo($tmpuser)
-	{
-		global $langs;
-
-		$warehouseid = (int) $tmpuser->fk_warehouse;
-		if ($warehouseid <= 0) {
-			return null;
-		}
-
-		if (is_object($langs)) {
-			$langs->load('stocks');
-			$langs->load('banks');
-		}
-
-		// Load the default warehouse of the user
-		$sql = "SELECT e.rowid, e.ref, e.lieu, e.description, e.address, e.zip, e.town, e.fk_pays, e.phone, e.statut";
-		$sql .= " FROM ".MAIN_DB_PREFIX."entrepot as e";
-		$sql .= " WHERE e.rowid = ".$warehouseid;
-		$sql .= " AND e.entity IN (".getEntity('stock').")";
-
-		$resql = $this->db->query($sql);
-		if (!$resql || !$this->db->num_rows($resql)) {
-			return null;
-		}
-		$obj = $this->db->fetch_object($resql);
-		$this->db->free($resql);
-
-		$countrylabel = '';
-		if (!empty($obj->fk_pays)) {
-			$countrylabel = getCountry($obj->fk_pays, '', $this->db);
-			if ($countrylabel == 'NotDefined') {
-				$countrylabel = '';
-			}
-		}
-
-		$warehouse = array(
-			'id' => (int) $obj->rowid,
-			'ref' => $obj->ref,
-			'nom' => ($obj->lieu !== '' && $obj->lieu !== null) ? $obj->lieu : $obj->ref,
-			'description' => $obj->description,
-			'adresse' => $obj->address,
-			'ville' => trim($obj->zip.' '.$obj->town),
-			'pays' => $countrylabel,
-			'telephone' => $obj->phone,
-			'etat' => ((int) $obj->statut == 1) ? 'Opened' : 'Closed',
-			'comptes_caisses' => array()
-		);
-
-		// Bank accounts / cash registers linked to this warehouse through the 'warehouse' extrafield
-		$typelib = array(
-			0 => (is_object($langs) ? $langs->trans('BankType0') : 'BankType0'),
-			1 => (is_object($langs) ? $langs->trans('BankType1') : 'BankType1'),
-			2 => (is_object($langs) ? $langs->trans('BankType2') : 'BankType2'),
-		);
-
-		$sqlacc = "SELECT ba.rowid, ba.ref, ba.label, ba.courant, ba.number, ba.currency_code, ba.clos";
-		$sqlacc .= " FROM ".MAIN_DB_PREFIX."bank_account as ba";
-		$sqlacc .= " INNER JOIN ".MAIN_DB_PREFIX."bank_account_extrafields as ef ON ef.fk_object = ba.rowid";
-		$sqlacc .= " WHERE ef.warehouse = ".$warehouseid;
-		$sqlacc .= " AND ba.entity IN (".getEntity('bank_account').")";
-		$sqlacc .= " ORDER BY ba.clos ASC, ba.label ASC";
-
-		$resacc = $this->db->query($sqlacc);
-		if ($resacc) {
-			while ($a = $this->db->fetch_object($resacc)) {
-				$accid = (int) $a->rowid;
-
-				// Balance = sum of bank lines of the account
-				$solde = 0;
-				$sqlsolde = "SELECT SUM(amount) as amount FROM ".MAIN_DB_PREFIX."bank WHERE fk_account = ".$accid;
-				$ressolde = $this->db->query($sqlsolde);
-				if ($ressolde) {
-					$objsolde = $this->db->fetch_object($ressolde);
-					if ($objsolde) {
-						$solde = (float) price2num($objsolde->amount, 'MU');
-					}
-					$this->db->free($ressolde);
-				}
-
-				// Conversion rate configured in Dolibarr for the account currency (relative to main currency)
-				$taux = 1;
-				if (!empty($a->currency_code)) {
-					$tmprate = MultiCurrency::getIdAndTxFromCode($this->db, $a->currency_code);
-					if (isset($tmprate[1]) && (float) $tmprate[1] != 0) {
-						$taux = (float) $tmprate[1];
-					}
-				}
-
-				$warehouse['comptes_caisses'][] = array(
-					'id' => $accid,
-					'ref' => $a->ref,
-					'libelle' => $a->label,
-					'type' => isset($typelib[(int) $a->courant]) ? $typelib[(int) $a->courant] : '',
-					'numero' => $a->number,
-					'devise' => $a->currency_code,
-					'taux_conversion' => $taux,
-					'solde' => $solde,
-					'etat' => ((int) $a->clos == 0) ? 'Opened' : 'Closed'
-				);
-			}
-			$this->db->free($resacc);
-		}
-
-		return $warehouse;
 	}
 }

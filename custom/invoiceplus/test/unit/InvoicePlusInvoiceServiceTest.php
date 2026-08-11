@@ -24,6 +24,7 @@ require_once DOL_DOCUMENT_ROOT.'/api/class/api.class.php';
 dol_include_once('/invoiceplus/class/invoiceplusinvoiceservice.class.php');
 
 use PHPUnit\Framework\TestCase;
+use Luracast\Restler\RestException;
 
 if (empty($user->id)) {
 	$user->fetch(1);
@@ -69,6 +70,49 @@ class InvoicePlusInvoiceServiceTest extends TestCase
 	{
 		$this->assertSame('t.rowid', $this->service->validateSortField('t.rowid'));
 		$this->assertSame('t.datef', $this->service->validateSortField('t.datef'));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testQualifiedSqlFiltersAreAccepted()
+	{
+		$this->service->validateSqlFilterAliases("(t.ref:like:'FA%') and (ef.channel:=:'shop')");
+		$this->addToAssertionCount(1);
+	}
+
+	/**
+	 * @param string $filter Invalid Universal Search expression
+	 * @return void
+	 * @dataProvider invalidSqlFilterProvider
+	 */
+	public function testUnsafeSqlFilterFieldsAreRejected($filter)
+	{
+		$this->expectException(RestException::class);
+		$this->service->validateSqlFilterAliases($filter);
+	}
+
+	/**
+	 * @return array<string,array<int,string>>
+	 */
+	public function invalidSqlFilterProvider()
+	{
+		return array(
+			'unqualified field' => array("(ref:like:'FA%')"),
+			'unknown alias' => array("(x.ref:=:'FA1')"),
+			'unknown invoice field' => array("(t.unknown:=:'x')"),
+			'constant operand' => array('(1:=:1)'),
+		);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testNativeResourceAccessBridgeIsPublicAndStatic()
+	{
+		$method = new ReflectionMethod(InvoicePlusNativeInvoicesApi::class, 'checkResourceAccess');
+		$this->assertTrue($method->isPublic());
+		$this->assertTrue($method->isStatic());
 	}
 
 	/**

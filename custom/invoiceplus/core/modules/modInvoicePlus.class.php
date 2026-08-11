@@ -40,7 +40,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->descriptionlong = 'ModuleInvoicePlusDescLong';
 		$this->editor_name = 'InvoicePlus';
 		$this->editor_url = '';
-		$this->version = '1.0.1';
+		$this->version = '1.1.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'bill';
 
@@ -77,7 +77,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->const[0] = array('INVOICEPLUS_API_ENABLED', 'chaine', '1', 'Enable the InvoicePlus REST API', 0);
 		$this->const[1] = array('INVOICEPLUS_MAX_API_LIMIT', 'chaine', '1000', 'Maximum number of invoices returned per page', 0);
 		$this->const[2] = array('INVOICEPLUS_ADD_WAREHOUSE_METADATA', 'chaine', '1', 'Add non-persistent warehouse filter metadata', 0);
-		$this->const[3] = array('INVOICEPLUS_LOAD_CLOSURE_DATA', 'chaine', '1', 'Keep native InvoiceClosure information', 0);
+		$this->const[3] = array('INVOICEPLUS_LOAD_CLOSURE_DATA', 'chaine', '1', 'Add InvoiceClosure information to InvoicePlus responses', 0);
 		$this->const[4] = array('INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS', 'chaine', '1', 'Resolve legacy invoice warehouses from stock/POS/account sources', 0);
 
 		if (!isModEnabled('invoiceplus')) {

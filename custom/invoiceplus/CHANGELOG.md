@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 - 2026-08-11
+
+- Move the former core route `GET /invoices/byaccounts` to
+  `GET /invoiceplus/byaccounts`.
+- Add core-free InvoicePlus wrappers for the invoice list, id, reference and
+  external-reference routes.
+- Build the optional `invoiceclosure` block inside InvoicePlus instead of
+  modifying Dolibarr's native `Invoices` API class.
+- Cap every list route, validate qualified SQL-filter fields and apply closure
+  status predicates before pagination.
+- Keep the native Dolibarr 20.0.4 invoice files untouched and upgrade-safe.
+
 ## 1.0.1 - 2026-08-06
 
 - Kept positive invoice-line warehouse assignments authoritative.

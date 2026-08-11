@@ -284,135 +284,6 @@ class Invoices extends DolibarrApi
 	}
 
 	/**
-	 * List invoices linked to bank accounts / cash registers
-	 *
-	 * Get a list of invoices whose bank account / cash register (field fk_account of the invoice) is in the given list of account ids.
-	 *
-	 * @param string	$account_ids	  Bank account / cash register ids to filter invoices (example '1' or '1,2,3') {@pattern /^[0-9,]*$/i}
-	 * @param string	$sortfield		  Sort field
-	 * @param string	$sortorder		  Sort order
-	 * @param int		$limit			  Limit for list
-	 * @param int		$page			  Page number
-	 * @param string	$thirdparty_ids	  Thirdparty ids to filter invoices of (example '1' or '1,2,3') {@pattern /^[0-9,]*$/i}
-	 * @param string	$status			  Filter by invoice status : draft | unpaid | paid | cancelled
-	 * @param string    $sqlfilters       Other criteria to filter answers separated by a comma. Syntax example "(t.ref:like:'SO-%') and (t.date_creation:<:'20160101')"
-	 * @param string    $properties	  Restrict the data returned to these properties. Ignored if empty. Comma separated list of properties names
-	 * @return array                      Array of invoice objects
-	 *
-	 * @url GET /byaccounts
-	 *
-	 * @throws RestException 400 Bad value for parameter account_ids
-	 * @throws RestException 403 Access denied
-	 * @throws RestException 404 Not found
-	 * @throws RestException 503 Error
-	 */
-	public function getByAccounts($account_ids = '', $sortfield = "t.rowid", $sortorder = 'ASC', $limit = 100, $page = 0, $thirdparty_ids = '', $status = '', $sqlfilters = '', $properties = '')
-	{
-		if (!DolibarrApiAccess::$user->hasRight('facture', 'lire')) {
-			throw new RestException(403);
-		}
-
-		// The list of account / cash register ids is mandatory and must be a comma separated list of integers
-		if (empty($account_ids) || !preg_match('/^[0-9]+(,[0-9]+)*$/', $account_ids)) {
-			throw new RestException(400, "Parameter account_ids is mandatory and must be a comma separated list of bank account / cash register ids (example '1' or '1,2,3').");
-		}
-
-		$obj_ret = array();
-
-		// case of external user, $thirdparty_ids param is ignored and replaced by user's socid
-		$socids = DolibarrApiAccess::$user->socid ? DolibarrApiAccess::$user->socid : $thirdparty_ids;
-
-		// If the internal user must only see his customers, force searching by him
-		$search_sale = 0;
-		if (!DolibarrApiAccess::$user->hasRight('societe', 'client', 'voir') && !$socids) {
-			$search_sale = DolibarrApiAccess::$user->id;
-		}
-
-		$sql = "SELECT t.rowid";
-		$sql .= " FROM ".MAIN_DB_PREFIX."facture AS t";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields AS ef ON (ef.fk_object = t.rowid)";
-		$sql .= ' WHERE t.entity IN ('.getEntity('invoice').')';
-		// Filter on the bank account / cash register linked to the invoice
-		$sql .= " AND t.fk_account IN (".$this->db->sanitize($account_ids).")";
-		if ($socids) {
-			$sql .= " AND t.fk_soc IN (".$this->db->sanitize($socids).")";
-		}
-		// Search on sale representative
-		if ($search_sale && $search_sale != '-1') {
-			if ($search_sale == -2) {
-				$sql .= " AND NOT EXISTS (SELECT sc.fk_soc FROM ".MAIN_DB_PREFIX."societe_commerciaux as sc WHERE sc.fk_soc = t.fk_soc)";
-			} elseif ($search_sale > 0) {
-				$sql .= " AND EXISTS (SELECT sc.fk_soc FROM ".MAIN_DB_PREFIX."societe_commerciaux as sc WHERE sc.fk_soc = t.fk_soc AND sc.fk_user = ".((int) $search_sale).")";
-			}
-		}
-		// Filter by status
-		if ($status == 'draft') {
-			$sql .= " AND t.fk_statut IN (0)";
-		}
-		if ($status == 'unpaid') {
-			$sql .= " AND t.fk_statut IN (1)";
-		}
-		if ($status == 'paid') {
-			$sql .= " AND t.fk_statut IN (2)";
-		}
-		if ($status == 'cancelled') {
-			$sql .= " AND t.fk_statut IN (3)";
-		}
-		// Add sql filters
-		if ($sqlfilters) {
-			$errormessage = '';
-			$sql .= forgeSQLFromUniversalSearchCriteria($sqlfilters, $errormessage);
-			if ($errormessage) {
-				throw new RestException(400, 'Error when validating parameter sqlfilters -> '.$errormessage);
-			}
-		}
-
-		$sql .= $this->db->order($sortfield, $sortorder);
-		if ($limit) {
-			if ($page < 0) {
-				$page = 0;
-			}
-			$offset = $limit * $page;
-
-			$sql .= $this->db->plimit($limit + 1, $offset);
-		}
-
-		$result = $this->db->query($sql);
-		if ($result) {
-			$i = 0;
-			$num = $this->db->num_rows($result);
-			$min = min($num, ($limit <= 0 ? $num : $limit));
-			while ($i < $min) {
-				$obj = $this->db->fetch_object($result);
-				$invoice_static = new Facture($this->db);
-				if ($invoice_static->fetch($obj->rowid)) {
-					// Get payment details
-					$invoice_static->totalpaid = $invoice_static->getSommePaiement();
-					$invoice_static->totalcreditnotes = $invoice_static->getSumCreditNotesUsed();
-					$invoice_static->totaldeposits = $invoice_static->getSumDepositsUsed();
-					$invoice_static->remaintopay = price2num($invoice_static->total_ttc - $invoice_static->totalpaid - $invoice_static->totalcreditnotes - $invoice_static->totaldeposits, 'MT');
-
-					// Add external contacts ids
-					$tmparray = $invoice_static->liste_contact(-1, 'external', 1);
-					if (is_array($tmparray)) {
-						$invoice_static->contacts_ids = $tmparray;
-					}
-					// Add online_payment_url, copied from order
-					require_once DOL_DOCUMENT_ROOT.'/core/lib/payments.lib.php';
-					$invoice_static->online_payment_url = getOnlinePaymentUrl(0, 'invoice', $invoice_static->ref);
-
-					$obj_ret[] = $this->_filterObjectProperties($this->_cleanObjectDatas($invoice_static), $properties);
-				}
-				$i++;
-			}
-		} else {
-			throw new RestException(503, 'Error when retrieve invoice list : '.$this->db->lasterror());
-		}
-
-		return $obj_ret;
-	}
-
-	/**
 	 * Create invoice object
 	 *
 	 * @param array $request_data   Request datas
@@ -1871,20 +1742,12 @@ class Invoices extends DolibarrApi
 	/**
 	 * Clean sensible object datas
 	 *
-	 * When the external module InvoiceClosure is enabled, every customer
-	 * invoice returned by this API is enriched with an "invoiceclosure"
-	 * property holding the business closure status (see _getInvoiceClosureData).
-	 *
 	 * @param   Object  $object     Object to clean
 	 * @return  Object              Object with cleaned properties
 	 */
 	protected function _cleanObjectDatas($object)
 	{
 		// phpcs:enable
-		// Keep discriminating values before the generic cleaning removes them
-		$iscustomerinvoice = (isset($object->element) && $object->element === 'facture');
-		$invoiceid = (empty($object->id) ? 0 : (int) $object->id);
-
 		$object = parent::_cleanObjectDatas($object);
 
 		unset($object->note);
@@ -1895,95 +1758,7 @@ class Invoices extends DolibarrApi
 		unset($object->barcode_type_coder);
 		unset($object->canvas);
 
-		// Module InvoiceClosure: expose the business closure status of customer invoices
-		if ($iscustomerinvoice && $invoiceid > 0) {
-			$closuredata = $this->_getInvoiceClosureData($invoiceid);
-			if ($closuredata !== null) {
-				$object->invoiceclosure = $closuredata;
-			}
-		}
-
 		return $object;
-	}
-
-	/**
-	 * Build the business closure information of a customer invoice
-	 * (external module InvoiceClosure).
-	 *
-	 * Returns null (property not added) when the module is disabled, when the
-	 * API user has no permission to read closure information, or on error.
-	 *
-	 * @param	int			$invoiceid	Invoice id
-	 * @return	array|null				Closure data, or null when not applicable
-	 */
-	private function _getInvoiceClosureData($invoiceid)
-	{
-		global $langs;
-
-		if (!isModEnabled('invoiceclosure')) {
-			return null;
-		}
-		if (empty(DolibarrApiAccess::$user) || !DolibarrApiAccess::$user->hasRight('invoiceclosure', 'read')) {
-			return null;
-		}
-		if (!dol_include_once('/invoiceclosure/class/invoiceclosure.class.php')) {
-			return null;
-		}
-
-		$closure = new InvoiceClosure($this->db);
-		$found = $closure->fetchByInvoice($invoiceid);
-		if ($found < 0) {
-			dol_syslog(get_class($this)."::_getInvoiceClosureData ".$closure->error, LOG_ERR);
-			return null;
-		}
-
-		$langs->loadLangs(array('invoiceclosure@invoiceclosure'));
-
-		$isclosed = ($found > 0 && (int) $closure->closure_status === InvoiceClosure::STATUS_CLOSED);
-		$businessstatuscode = 'not_closed';
-		if ($isclosed) {
-			$businessstatuscode = 'closed';
-		} elseif ($found > 0 && !empty($closure->date_reopen)) {
-			$businessstatuscode = 'reopened';
-		}
-
-		$data = array(
-			'business_status' => $isclosed ? 1 : 0,
-			'business_status_code' => $businessstatuscode,
-			'business_status_label' => $isclosed ? $langs->trans('InvoiceClosed') : $langs->trans('InvoiceNotClosed'),
-			'locked' => ($isclosed && getDolGlobalInt('INVOICECLOSURE_LOCK_CLOSED_INVOICES')) ? 1 : 0,
-			'closed_at' => null,
-			'closed_at_iso' => null,
-			'closed_by' => null,
-			'closure_note' => '',
-			'reopened_at' => null,
-			'reopened_at_iso' => null,
-			'reopened_by' => null,
-			'reopen_note' => '',
-		);
-
-		if ($found > 0) {
-			if (!empty($closure->date_closure)) {
-				$data['closed_at'] = (int) $closure->date_closure;
-				$data['closed_at_iso'] = dol_print_date($closure->date_closure, 'dayhourrfc');
-				$data['closed_by'] = array(
-					'id' => (int) $closure->fk_user_closure,
-					'login' => $closure->closure_login,
-				);
-				$data['closure_note'] = $closure->closure_note;
-			}
-			if (!empty($closure->date_reopen)) {
-				$data['reopened_at'] = (int) $closure->date_reopen;
-				$data['reopened_at_iso'] = dol_print_date($closure->date_reopen, 'dayhourrfc');
-				$data['reopened_by'] = array(
-					'id' => (int) $closure->fk_user_reopen,
-					'login' => $closure->reopen_login,
-				);
-				$data['reopen_note'] = $closure->reopen_note;
-			}
-		}
-
-		return $data;
 	}
 
 	/**

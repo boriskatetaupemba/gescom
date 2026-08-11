@@ -1,12 +1,17 @@
-# InvoicePlus 1.0.1
+# InvoicePlus 1.1.0
 
-InvoicePlus is an extensible Dolibarr module for customer-invoice services. Its first endpoint lists invoices assigned to a requested warehouse. It uses the standard invoice-line warehouse when present and can resolve legacy POS invoices whose lines still contain `fk_warehouse = 0`:
+InvoicePlus is an extensible Dolibarr module for customer-invoice services. It now owns every invoice API customization that previously lived in Dolibarr core:
 
 ```text
+GET /api/index.php/invoiceplus
+GET /api/index.php/invoiceplus/{invoice_id}
+GET /api/index.php/invoiceplus/ref/{ref}
+GET /api/index.php/invoiceplus/ref_ext/{ref_ext}
+GET /api/index.php/invoiceplus/byaccounts?account_ids=1,2,3
 GET /api/index.php/invoiceplus/warehouse/{warehouse_id}
 ```
 
-The module does not replace `Invoices`, does not publish a conflicting `/invoices/{warehouse_id}` route, creates no table, and changes no Dolibarr core file.
+The module delegates standard invoice construction and access checks to Dolibarr's native `Invoices` API, adds optional InvoiceClosure information itself, creates no table, and changes no Dolibarr core file. Native `/invoices` routes remain available with their stock 20.0.4 behavior.
 
 ## Verified target environment
 
@@ -20,7 +25,7 @@ The module does not replace `Invoices`, does not publish a conflicting `/invoice
 
 The native Dolibarr 20.0.4 `Invoices::index()` parameters are exactly `sortfield`, `sortorder`, `limit`, `page`, `thirdparty_ids`, `status`, `sqlfilters`, and `properties`. It enforces invoice read permission, entity visibility, the external user's third party, and customer-sales-representative restrictions. It loads each `Facture`, computes `totalpaid`, `totalcreditnotes`, `totaldeposits`, and `remaintopay`, adds external contact ids and the online payment URL, then applies native cleanup and property filtering.
 
-This installation also contains a native invoice API enrichment for InvoiceClosure. InvoicePlus calls the public `Invoices::get()` method, so its `invoiceclosure` property, types, labels, dates, permissions, and absence rules come directly from that native implementation.
+InvoicePlus calls the public native API and then builds the optional `invoiceclosure` property through the public InvoiceClosure business class. The native `compta/facture/class/api_invoices.class.php` is left byte-for-byte identical to Dolibarr 20.0.4.
 
 The complete audit is in [docs/AUDIT.md](docs/AUDIT.md).
 
@@ -42,10 +47,24 @@ The archive contains a top-level `invoiceplus/` directory and is directly suitab
 | `INVOICEPLUS_API_ENABLED` | `1` | Enables the endpoint. Disabled calls return HTTP 403. |
 | `INVOICEPLUS_MAX_API_LIMIT` | `1000` | Caps page size; `limit<=0` uses this cap. |
 | `INVOICEPLUS_ADD_WAREHOUSE_METADATA` | `1` | Adds non-persistent `invoiceplus_warehouse_filter`. |
-| `INVOICEPLUS_LOAD_CLOSURE_DATA` | `1` | Keeps the exact native `invoiceclosure` property. `0` removes it from InvoicePlus responses. |
+| `INVOICEPLUS_LOAD_CLOSURE_DATA` | `1` | Adds the module-owned `invoiceclosure` property to InvoicePlus responses. `0` omits it. |
 | `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS` | `1` | For invoices with no assigned line warehouse, resolves legacy records from native stock movements, PosNova ticket configuration, TakePOS terminal configuration, or the bank-account `warehouse` extrafield. |
 
-## Endpoint parameters
+## Routes moved out of core
+
+| Old core-customized route | Module route | Notes |
+|---|---|---|
+| `GET /invoices` | `GET /invoiceplus` | Native-compatible list plus optional `invoiceclosure`. |
+| `GET /invoices/{id}` | `GET /invoiceplus/{id}` | Native-compatible object plus optional `invoiceclosure`. |
+| `GET /invoices/ref/{ref}` | `GET /invoiceplus/ref/{ref}` | Lookup by reference. |
+| `GET /invoices/ref_ext/{ref_ext}` | `GET /invoiceplus/ref_ext/{ref_ext}` | Lookup by external reference. |
+| `GET /invoices/byaccounts` | `GET /invoiceplus/byaccounts` | Requires `account_ids=1,2,3`. |
+
+The old custom paths cannot be retained by an external module because Dolibarr routes `/invoices` to its core API class. Clients must switch to the module paths above. Write operations remain on the native `/invoices` API; InvoiceClosure state is available separately from `/invoiceclosureapi`.
+
+All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero or negative value uses that configured maximum instead of producing an unbounded response.
+
+## Warehouse endpoint parameters
 
 | Parameter | Default | Notes |
 |---|---|---|
@@ -79,7 +98,7 @@ The archive contains a top-level `invoiceplus/` directory and is directly suitab
 
 ## Security model
 
-The route requires authenticated REST access plus both `facture.lire` and `stock.lire`. Warehouse loading then uses the native stock resource check. Invoice selection uses `getEntity('stock')` and `getEntity('invoice')`, so `DOLAPIENTITY` follows Dolibarr's entity context.
+All routes require authenticated REST access and `facture.lire`. The warehouse route additionally requires `stock.lire`, then applies the native stock resource check. Invoice selection uses `getEntity('stock')` and `getEntity('invoice')`, so `DOLAPIENTITY` follows Dolibarr's entity context.
 
 External users are forced to their own `socid`. Internal users without the global customer-view permission are restricted through `societe_commerciaux`, matching the installed native invoice list. Finally, every selected invoice passes through `Invoices::get()`, which applies `_checkAccessToResource('facture', id)` before returning data.
 
@@ -87,9 +106,9 @@ An explicit positive `facturedet.fk_warehouse` is authoritative. Fallbacks are c
 
 ## InvoiceClosure integration
 
-When InvoiceClosure is disabled, the native API adds no closure property and InvoicePlus continues normally. When enabled and authorized, InvoicePlus preserves the exact native `invoiceclosure` object. It does not query InvoiceClosure tables.
+When InvoiceClosure is disabled, InvoicePlus adds no closure property and continues normally. When enabled and authorized, `InvoicePlusInvoiceService` calls `InvoiceClosure::fetchByInvoice()` and builds the same documented `invoiceclosure` object that formerly came from the patched core API. Native `/invoices` responses are no longer modified.
 
-The extra `closed` and `paid_not_closed` filters first restrict invoices to Dolibarr's paid status and then call the public `InvoiceClosure::getClosureStatus()` interface. They require the InvoiceClosure read permission. See [docs/CLOSURE.md](docs/CLOSURE.md).
+On `GET /invoiceplus/warehouse/{warehouse_id}` only, the extra `closed` and `paid_not_closed` filters first restrict invoices to Dolibarr's paid status, then apply an indexed predicate on InvoiceClosure's module-owned status table before counting and paging. They require the InvoiceClosure read permission. The root and `/byaccounts` lists retain the native status set. See [docs/CLOSURE.md](docs/CLOSURE.md).
 
 ## REST explorer
 
@@ -99,23 +118,24 @@ After activation, visit:
 https://YOUR-DOLIBARR/api/index.php/explorer/
 ```
 
-Find the `invoiceplus` API and verify `GET /warehouse/{warehouse_id}`. If it is absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
+Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, and `GET /warehouse/{warehouse_id}`. If they are absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
 
 ## Tests
 
-- Unit tests: `phpunit test/unit/InvoicePlusInvoiceServiceTest.php` from the module directory.
+- Unit tests: run `phpunit test/unit/InvoicePlusInvoiceServiceTest.php` from the module directory with a PHPUnit release compatible with the installed PHP version. The legacy PEAR PHPUnit bundled with some XAMPP releases is not supported on PHP 8.
 - PowerShell API suite: `test/api/test_invoiceplus_api.ps1`.
 - POSIX API suite: `test/api/test_invoiceplus_api.sh` (requires `curl` and `jq`).
 - Manual acceptance matrix: [test/MANUAL_TESTS.md](test/MANUAL_TESTS.md).
 
-Pass `InvoiceId`/`INVOICE_ID` for a record belonging to the tested warehouse. The scripts then compare the canonical native `/invoices/{id}` payload with InvoicePlus using `loadlinkedobjects=true`, allowing only removal of `invoiceplus_warehouse_filter` before comparison.
+Pass `InvoiceId`/`INVOICE_ID` for a record belonging to the tested warehouse. The scripts compare the canonical native `/invoices/{id}` payload with InvoicePlus using `loadlinkedobjects=true`, excluding the module-owned `invoiceclosure` and `invoiceplus_warehouse_filter` fields from the structural comparison.
+Pass `AccountIds`/`ACCOUNT_IDS` as a comma-separated list to exercise the `/byaccounts` route as well.
 
 ## Performance and limitations
 
 - Native response construction performs one native invoice fetch per selected id. This intentionally follows Dolibarr's own list implementation and prevents format/security drift.
 - Warehouse fallbacks add indexed existence checks for legacy invoices. Set `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=0` to restore strict line-only selection.
-- Fallback resolution does not rewrite historical data or alter the native `/invoices` response: its line-level `fk_warehouse` values remain exactly as stored. PosNova 1.0.1 writes the warehouse on newly created invoice lines and records the invoice as stock-movement origin.
-- `closed` and `paid_not_closed` scan eligible paid ids through the public InvoiceClosure method before pagination. This is slower on very large paid-invoice sets but preserves module encapsulation and exact pagination counts. A future public batch method in InvoiceClosure can replace this without changing the endpoint.
+- Fallback resolution and closure enrichment do not rewrite historical data or alter the native `/invoices` response. PosNova 1.0.1 writes the warehouse on newly created invoice lines and records the invoice as stock-movement origin.
+- On the warehouse endpoint, `closed` and `paid_not_closed` use InvoiceClosure's indexed status table in the selection query, so filtering, counting and pagination stay bounded by the database query rather than an application-side scan.
 - `pagination_data`, date filtering, `withLines`, `warehouse_lines_only`, and the maximum page cap are InvoicePlus extensions because the installed 20.0.4 native `Invoices::index()` does not expose them.
 - Live HTTP and database integration tests require the deployed Dolibarr database and API authentication; they cannot be truthfully completed against a source-only checkout.
 

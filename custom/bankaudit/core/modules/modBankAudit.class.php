@@ -62,7 +62,7 @@ class modBankAudit extends DolibarrModules
 		$this->editor_name = 'BankAudit';
 		$this->editor_url = '';
 
-		$this->version = '1.0.0';
+		$this->version = '1.1.0';
 
 		// Key used in llx_const table to save module status enabled/disabled
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
@@ -105,7 +105,7 @@ class modBankAudit extends DolibarrModules
 
 		// Dependencies
 		$this->hidden = false;
-		$this->depends = array('modBanque');     // Banks & Cash module is required
+		$this->depends = array('modBanque', 'modStock'); // Bank/cash and warehouse modules are required
 		$this->requiredby = array();
 		$this->conflictwith = array();
 

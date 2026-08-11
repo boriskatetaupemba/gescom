@@ -1,6 +1,6 @@
 # InvoiceClosure response compatibility
 
-InvoicePlus treats the installed native invoice API as the only owner of the closure payload. `InvoicePlusInvoiceService::buildInvoiceApiResponse()` invokes `Invoices::get()`, whose installed cleanup adds `invoiceclosure` only when all of these conditions are true:
+InvoicePlus treats InvoiceClosure's public business class as the source of closure state. `InvoicePlusInvoiceService::buildInvoiceApiResponse()` first invokes native `Invoices::get()`, then adds `invoiceclosure` inside the custom module only when all of these conditions are true:
 
 1. InvoiceClosure is enabled.
 2. The current API user has `invoiceclosure.read`.
@@ -9,7 +9,7 @@ InvoicePlus treats the installed native invoice API as the only owner of the clo
 
 No placeholder property is created when these conditions are false.
 
-The installed native property contains:
+The InvoicePlus-owned property contains:
 
 ```json
 {
@@ -30,10 +30,10 @@ The installed native property contains:
 }
 ```
 
-Values above are illustrative; labels, timestamps, users, and notes always come from the installed native API.
+Values above are illustrative; labels, timestamps, users, and notes come from InvoiceClosure through the module-owned response builder.
 
-`properties` is applied after the native response and optional warehouse metadata are ready. Consequently, `properties=id,ref` removes `invoiceclosure`, matching native list filtering. Include `invoiceclosure` explicitly to retain it in a restricted response.
+`properties` is applied after the native response, closure block, and optional warehouse metadata are ready. Consequently, `properties=id,ref` removes `invoiceclosure`. Include `invoiceclosure` explicitly to retain it in a restricted response.
 
-`INVOICEPLUS_LOAD_CLOSURE_DATA=0` deliberately removes `invoiceclosure` from InvoicePlus only. This configuration is documented as a chosen difference from an enriched native API.
+`INVOICEPLUS_LOAD_CLOSURE_DATA=0` deliberately omits `invoiceclosure` from InvoicePlus. Native `/invoices` routes always retain their stock Dolibarr 20.0.4 behavior and never receive this module-owned property.
 
-`status=closed` and `status=paid_not_closed` are available only while InvoiceClosure is active and the user can read closure information. Both start with Dolibarr paid invoices (`fk_statut=2`); the service then calls the public `InvoiceClosure::getClosureStatus()` for the exact business state before counting and paging.
+On `GET /invoiceplus/warehouse/{warehouse_id}` only, `status=closed` and `status=paid_not_closed` are available while InvoiceClosure is active and the user can read closure information. Both start with Dolibarr paid invoices (`fk_statut=2`); the service then applies an indexed `EXISTS`/`NOT EXISTS` predicate to InvoiceClosure's module-owned status table before counting and paging. The root and `/byaccounts` lists retain Dolibarr's native status values.

@@ -495,7 +495,7 @@ class BankAccounts extends DolibarrApi
 	 * @param string $type             Payment mode (TYP,VIR,PRE,LIQ,VAD,CB,CHQ...) {@from body}
 	 * @param string $label            Label {@from body}
 	 * @param float  $amount           Amount (may be 0) {@from body}
-	 * @param int    $category         Category (rowid of a bank-line category / transaction tag) {@from body}
+	 * @param int    $category         Category
 	 * @param string $cheque_number    Cheque numero {@from body}
 	 * @param string $cheque_writer    Name of cheque writer {@from body}
 	 * @param string $cheque_bank      Bank of cheque writer {@from body}

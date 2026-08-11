@@ -17,6 +17,8 @@
 
 use Luracast\Restler\RestException;
 
+dol_include_once('/bankaudit/class/bankauditusercontext.class.php');
+
 /**
  * \file       custom/bankaudit/class/api_bankaudit.class.php
  * \ingroup    bankaudit
@@ -45,6 +47,44 @@ class BankAuditApi extends DolibarrApi
 	}
 
 	/**
+	 * Return the authenticated user's default warehouse and linked cash accounts.
+	 *
+	 * This endpoint replaces the former core customization of POST /login. A
+	 * client first obtains its token from the native login route, then calls
+	 * this endpoint with the DOLAPIKEY header.
+	 *
+	 * @return array User context containing a nullable default_warehouse property
+	 *
+	 * @url GET /context
+	 *
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 503 Database read error
+	 */
+	public function getCurrentUserContext()
+	{
+		$this->assertModuleEnabled();
+		$apiUser = DolibarrApiAccess::$user;
+		if (!$apiUser->hasRight('stock', 'lire') || !$apiUser->hasRight('banque', 'lire')) {
+			throw new RestException(403, 'Stock and bank-account read permissions are required.');
+		}
+
+		$warehouseId = (int) $apiUser->fk_warehouse;
+		if ($warehouseId > 0 && !DolibarrApi::_checkAccessToResource('stock', $warehouseId, 'entrepot')) {
+			throw new RestException(403, 'Access not allowed to the default warehouse.');
+		}
+
+		try {
+			$contextService = new BankAuditUserContext($this->db);
+			$defaultWarehouse = $contextService->getDefaultWarehouse($apiUser);
+		} catch (RuntimeException $exception) {
+			dol_syslog(__METHOD__.' '.$exception->getMessage(), LOG_ERR);
+			throw new RestException(503, 'Unable to read the user warehouse context.');
+		}
+
+		return array('default_warehouse' => $defaultWarehouse);
+	}
+
+	/**
 	 * List bank entries of the accounts / cash registers of a warehouse
 	 *
 	 * Return the list of bank entries (rows of the bank ledger) for every account / cash register
@@ -70,6 +110,7 @@ class BankAuditApi extends DolibarrApi
 	public function getWarehouseEntries($warehouse_id, $account_ids = '', $date_start = '', $date_end = '', $sortfield = "b.datev", $sortorder = 'DESC', $limit = 100, $page = 0, $sqlfilters = '')
 	{
 		global $conf;
+		$this->assertModuleEnabled();
 
 		// The viewer must be allowed to read bank accounts
 		if (!DolibarrApiAccess::$user->hasRight('banque', 'lire')) {
@@ -219,5 +260,21 @@ class BankAuditApi extends DolibarrApi
 		}
 
 		return $obj_ret;
+	}
+
+	/**
+	 * Reject direct API calls while the module is disabled.
+	 *
+	 * Dolibarr's direct route loader can include a custom API class without
+	 * checking the corresponding module switch.
+	 *
+	 * @return void
+	 * @throws RestException 403 Module disabled
+	 */
+	private function assertModuleEnabled()
+	{
+		if (!isModEnabled('bankaudit')) {
+			throw new RestException(403, 'BankAudit module is disabled.');
+		}
 	}
 }
