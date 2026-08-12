@@ -36,6 +36,14 @@ assert_code 'root invoice list' 200 "$code"
 jq -e 'type == "array" and length <= 2' "$TMPDIR_INVOICEPLUS/root.json" >/dev/null
 echo 'PASS  root list cap'
 
+code=$(request "$ROOT_ENDPOINT/thirdparties?limit=2&page=0&properties=id,name" "$TMPDIR_INVOICEPLUS/thirdparties.json")
+assert_code 'assigned third-party list' 200 "$code"
+jq -e 'type == "array" and length <= 2 and all(.[]; ((keys - ["id", "name"]) | length) == 0)' "$TMPDIR_INVOICEPLUS/thirdparties.json" >/dev/null
+echo 'PASS  assigned third-party scope and properties'
+
+code=$(request "$ROOT_ENDPOINT/thirdparties?sortfield=t.unknown" "$TMPDIR_INVOICEPLUS/bad-thirdparty-sort.json")
+assert_code 'invalid third-party sort field' 400 "$code"
+
 if [ -n "${ACCOUNT_IDS:-}" ]; then
 	encoded_account_ids=$(jq -rn --arg value "$ACCOUNT_IDS" '$value | @uri')
 	code=$(request "$ROOT_ENDPOINT/byaccounts?account_ids=$encoded_account_ids&limit=2" "$TMPDIR_INVOICEPLUS/by-accounts.json")

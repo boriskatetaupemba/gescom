@@ -16,6 +16,7 @@
 use Luracast\Restler\RestException;
 
 dol_include_once('/invoiceplus/class/invoiceplusinvoiceservice.class.php');
+dol_include_once('/invoiceplus/class/invoiceplusthirdpartyservice.class.php');
 
 /**
  * InvoicePlus REST API.
@@ -28,6 +29,9 @@ class Invoiceplus extends DolibarrApi
 	/** @var InvoicePlusInvoiceService */
 	private $invoiceService;
 
+	/** @var InvoicePlusThirdPartyService */
+	private $thirdPartyService;
+
 	/**
 	 * Constructor.
 	 */
@@ -37,6 +41,45 @@ class Invoiceplus extends DolibarrApi
 
 		$this->db = $db;
 		$this->invoiceService = null;
+		$this->thirdPartyService = null;
+	}
+
+	/**
+	 * List active third parties assigned to the authenticated sales representative.
+	 *
+	 * The sales representative is always the user identified by the REST API key;
+	 * no user id can be supplied by the caller.
+	 *
+	 * @param string $sortfield Third-party sort field
+	 * @param string $sortorder ASC or DESC
+	 * @param int    $limit     Page size, capped by INVOICEPLUS_MAX_API_LIMIT
+	 * @param int    $page      Zero-based page
+	 * @param int    $status    1 active, 0 closed, -1 all
+	 * @param string $properties Comma-separated response properties
+	 * @return array             Native Dolibarr third-party objects
+	 *
+	 * @url GET /thirdparties
+	 *
+	 * @throws RestException 400 Invalid parameter
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 503 Database read error
+	 */
+	public function getAssignedThirdParties($sortfield = 't.nom', $sortorder = 'ASC', $limit = 100, $page = 0, $status = 1, $properties = '')
+	{
+		$this->assertInvoicePlusApiEnabled();
+		$user = DolibarrApiAccess::$user;
+		if (empty($user->id) || !empty($user->socid) || !$user->hasRight('societe', 'lire')) {
+			throw new RestException(403, 'Access forbidden.');
+		}
+
+		return $this->getThirdPartyService()->getAssignedThirdParties(array(
+			'sortfield' => $sortfield,
+			'sortorder' => $sortorder,
+			'limit' => $limit,
+			'page' => $page,
+			'status' => $status,
+			'properties' => $properties,
+		));
 	}
 
 	/**
@@ -351,14 +394,25 @@ class Invoiceplus extends DolibarrApi
 	 */
 	private function assertInvoiceApiAccess()
 	{
+		$this->assertInvoicePlusApiEnabled();
+		if (!DolibarrApiAccess::$user->hasRight('facture', 'lire')) {
+			throw new RestException(403, 'Access forbidden.');
+		}
+	}
+
+	/**
+	 * Check the module and API switches shared by every InvoicePlus route.
+	 *
+	 * @return void
+	 * @throws RestException
+	 */
+	private function assertInvoicePlusApiEnabled()
+	{
 		if (!isModEnabled('invoiceplus')) {
 			throw new RestException(403, 'InvoicePlus module is disabled.');
 		}
 		if (!getDolGlobalInt('INVOICEPLUS_API_ENABLED', 1)) {
 			throw new RestException(403, 'InvoicePlus API is disabled.');
-		}
-		if (!DolibarrApiAccess::$user->hasRight('facture', 'lire')) {
-			throw new RestException(403, 'Access forbidden.');
 		}
 	}
 
@@ -374,6 +428,20 @@ class Invoiceplus extends DolibarrApi
 		}
 
 		return $this->invoiceService;
+	}
+
+	/**
+	 * Lazily create the authenticated third-party service.
+	 *
+	 * @return InvoicePlusThirdPartyService
+	 */
+	private function getThirdPartyService()
+	{
+		if ($this->thirdPartyService === null) {
+			$this->thirdPartyService = new InvoicePlusThirdPartyService($this->db, DolibarrApiAccess::$user);
+		}
+
+		return $this->thirdPartyService;
 	}
 
 	/**

@@ -1,4 +1,4 @@
-# InvoicePlus 1.1.0
+# InvoicePlus 1.2.0
 
 InvoicePlus is an extensible Dolibarr module for customer-invoice services. It now owns every invoice API customization that previously lived in Dolibarr core:
 
@@ -9,6 +9,7 @@ GET /api/index.php/invoiceplus/ref/{ref}
 GET /api/index.php/invoiceplus/ref_ext/{ref_ext}
 GET /api/index.php/invoiceplus/byaccounts?account_ids=1,2,3
 GET /api/index.php/invoiceplus/warehouse/{warehouse_id}
+GET /api/index.php/invoiceplus/thirdparties
 ```
 
 The module delegates standard invoice construction and access checks to Dolibarr's native `Invoices` API, adds optional InvoiceClosure information itself, creates no table, and changes no Dolibarr core file. Native `/invoices` routes remain available with their stock 20.0.4 behavior.
@@ -60,6 +61,32 @@ The archive contains a top-level `invoiceplus/` directory and is directly suitab
 | `GET /invoices/ref_ext/{ref_ext}` | `GET /invoiceplus/ref_ext/{ref_ext}` | Lookup by external reference. |
 | `GET /invoices/byaccounts` | `GET /invoiceplus/byaccounts` | Requires `account_ids=1,2,3`. |
 
+## Third parties of the authenticated sales representative
+
+`GET /invoiceplus/thirdparties` returns every Dolibarr third party assigned to
+the user authenticated by the REST API key. The route never accepts a user id:
+even users allowed to view all customers receive only their own assignments
+from `societe_commerciaux`.
+
+The response is an array of native-compatible third-party list objects. It is
+empty (`[]`, HTTP 200) when no assignment matches. All third-party types are
+included (customers, prospects and suppliers); active records are selected by
+default.
+
+| Parameter | Default | Notes |
+|---|---:|---|
+| `sortfield` | `t.nom` | Whitelist: id, name, alias, customer code, town, creation/modification date and status. |
+| `sortorder` | `ASC` | `ASC` or `DESC`. |
+| `limit` | `100` | Capped by `INVOICEPLUS_MAX_API_LIMIT`; zero or negative uses the cap. |
+| `page` | `0` | Zero-based and non-negative. |
+| `status` | `1` | `1` active, `0` closed, `-1` all. |
+| `properties` | empty | Native comma-separated property filtering. |
+
+This route requires an internal user with `societe.lire`; invoice-read access
+is not required because no invoice data is returned. It applies
+`getEntity('societe')`, so the `DOLAPIENTITY` header and configured entity
+sharing are respected. External users receive HTTP 403.
+
 The old custom paths cannot be retained by an external module because Dolibarr routes `/invoices` to its core API class. Clients must switch to the module paths above. Write operations remain on the native `/invoices` API; InvoiceClosure state is available separately from `/invoiceclosureapi`.
 
 All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero or negative value uses that configured maximum instead of producing an unbounded response.
@@ -98,9 +125,9 @@ All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero
 
 ## Security model
 
-All routes require authenticated REST access and `facture.lire`. The warehouse route additionally requires `stock.lire`, then applies the native stock resource check. Invoice selection uses `getEntity('stock')` and `getEntity('invoice')`, so `DOLAPIENTITY` follows Dolibarr's entity context.
+All routes require authenticated REST access. Invoice routes require `facture.lire`; the warehouse route additionally requires `stock.lire` and applies the native stock resource check. The assigned-third-party route instead requires `societe.lire` and an internal user. Invoice and third-party selection use their native entity scopes, so `DOLAPIENTITY` follows Dolibarr's entity context.
 
-External users are forced to their own `socid`. Internal users without the global customer-view permission are restricted through `societe_commerciaux`, matching the installed native invoice list. Finally, every selected invoice passes through `Invoices::get()`, which applies `_checkAccessToResource('facture', id)` before returning data.
+On invoice routes, external users are forced to their own `socid`; internal users without the global customer-view permission are restricted through `societe_commerciaux`, matching the installed native invoice list. Every selected invoice passes through `Invoices::get()`, which applies `_checkAccessToResource('facture', id)` before returning data. The assigned-third-party route rejects external users and always applies the exact authenticated internal user id, regardless of global customer-view permission.
 
 An explicit positive `facturedet.fk_warehouse` is authoritative. Fallbacks are considered only when every invoice line is unassigned (`NULL` or `0`), so a POS/account mapping cannot override a real line warehouse. Invoice-level `EXISTS` predicates guarantee one occurrence per invoice even when several matching records exist. User values never select the warehouse SQL expression or the sort field.
 
@@ -118,7 +145,7 @@ After activation, visit:
 https://YOUR-DOLIBARR/api/index.php/explorer/
 ```
 
-Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, and `GET /warehouse/{warehouse_id}`. If they are absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
+Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, and `GET /thirdparties`. If they are absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
 
 ## Tests
 

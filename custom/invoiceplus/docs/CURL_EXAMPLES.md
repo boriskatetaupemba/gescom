@@ -16,6 +16,16 @@ curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
   "https://YOUR-DOLIBARR/api/index.php/invoiceplus/byaccounts?account_ids=5,9&sortorder=DESC"
 ```
 
+## Third parties assigned to the authenticated sales representative
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/thirdparties?limit=100&page=0&status=1"
+```
+
+The route deliberately has no `user_id` parameter and always uses the owner of
+the supplied API key.
+
 ## Simple search
 
 ```bash

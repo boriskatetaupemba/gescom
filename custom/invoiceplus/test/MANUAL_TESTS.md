@@ -2,7 +2,7 @@
 
 Run these checks on a disposable Dolibarr 20.0.4 test entity with API, Customer Invoices, Stock, and InvoicePlus enabled.
 
-1. Confirm `/api/index.php/explorer/` lists `invoiceplus`, the root list, `GET /byaccounts`, and `GET /warehouse/{warehouse_id}`.
+1. Confirm `/api/index.php/explorer/` lists `invoiceplus`, the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, and `GET /thirdparties`.
 2. Test a warehouse with no invoices: HTTP 200 and `[]`.
 3. Test valid, zero, negative, non-numeric, and unknown warehouse ids.
 4. Compare an invoice returned by InvoicePlus with `GET /invoices/{id}` using `loadlinkedobjects=true`; exclude the module-owned `invoiceclosure` and `invoiceplus_warehouse_filter` fields before comparing the native payload.
@@ -24,3 +24,7 @@ Run these checks on a disposable Dolibarr 20.0.4 test entity with API, Customer 
 20. Set `INVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=0`; confirm historical zero-line invoices are excluded while invoices with matching positive line warehouses remain available.
 21. Call `GET /invoiceplus/byaccounts?account_ids=<ids>` and verify filtering, pagination, access restrictions, property filtering, and optional `invoiceclosure` data.
 22. Confirm the former custom path `GET /invoices/byaccounts` is absent and that clients use `GET /invoiceplus/byaccounts`.
+23. Assign A and C to sales representative U, B and C to V, and leave D unassigned. Verify U receives A and C exactly once, V receives B and C, and neither receives D.
+24. Give U the global customer-view right and verify `/invoiceplus/thirdparties` is still restricted to A and C. Removing an assignment must remove the third party immediately.
+25. Verify `status=1`, `status=0`, `status=-1`, property filtering, stable pages and invalid sorting/status parameters. No assignment must return HTTP 200 with `[]`.
+26. Verify an external user and a user missing `societe.lire` receive HTTP 403. A user with `societe.lire` but without `facture.lire` must still access this route, and `DOLAPIENTITY` must never leak a third party from another entity.

@@ -22,6 +22,7 @@ require_once dirname(__FILE__).'/../../../../master.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/api/class/api_access.class.php';
 require_once DOL_DOCUMENT_ROOT.'/api/class/api.class.php';
 dol_include_once('/invoiceplus/class/invoiceplusinvoiceservice.class.php');
+dol_include_once('/invoiceplus/class/invoiceplusthirdpartyservice.class.php');
 
 use PHPUnit\Framework\TestCase;
 use Luracast\Restler\RestException;
@@ -192,5 +193,153 @@ class InvoicePlusInvoiceServiceTest extends TestCase
 		$this->assertSame(1, $result['pagination']['page']);
 		$this->assertSame(3, $result['pagination']['page_count']);
 		$this->assertSame(5, $result['pagination']['limit']);
+	}
+}
+
+/**
+ * Deterministic validation tests for the assigned-third-party endpoint.
+ */
+class InvoicePlusThirdPartyServiceTest extends TestCase
+{
+	/** @var InvoicePlusThirdPartyService */
+	private $service;
+
+	/**
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		global $db, $user;
+		$this->service = new InvoicePlusThirdPartyService($db, $user);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testThirdPartySortFieldWhitelist()
+	{
+		$this->assertSame('t.rowid', $this->service->validateSortField('t.rowid'));
+		$this->assertSame('t.nom', $this->service->validateSortField('t.nom'));
+		$this->assertSame('t.code_client', $this->service->validateSortField('t.code_client'));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testInvalidThirdPartySortFieldIsRejected()
+	{
+		$this->expectException(RestException::class);
+		$this->service->validateSortField('t.note_private');
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testThirdPartySortOrderValidation()
+	{
+		$this->assertSame('ASC', $this->service->validateSortOrder('asc'));
+		$this->assertSame('DESC', $this->service->validateSortOrder('DESC'));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testInvalidThirdPartySortOrderIsRejected()
+	{
+		$this->expectException(RestException::class);
+		$this->service->validateSortOrder('RANDOM');
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testThirdPartyPaginationValidation()
+	{
+		$this->assertSame(25, $this->service->validateLimit('25'));
+		$this->assertSame($this->service->validateLimit(0), $this->service->validateLimit(PHP_INT_MAX));
+		$this->assertSame(0, $this->service->validatePage('0'));
+		$this->assertSame(3, $this->service->validatePage(3));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testAssignedThirdPartyQueryUsesAuthenticatedUserAndStablePaging()
+	{
+		$database = new class {
+			public $lastSql = '';
+			public function order($field, $order) { return ' ORDER BY '.$field.' '.$order; }
+			public function plimit($limit, $offset) { return ' LIMIT '.$limit.' OFFSET '.$offset; }
+			public function query($sql) { $this->lastSql = $sql; return new stdClass(); }
+			public function fetch_object($result) { return false; }
+			public function free($result) {}
+			public function lasterror() { return 'not exposed'; }
+		};
+		$authenticatedUser = new stdClass();
+		$authenticatedUser->id = 42;
+		$service = new InvoicePlusThirdPartyService($database, $authenticatedUser);
+
+		$result = $service->getAssignedThirdParties(array(
+			'sortfield' => 't.nom',
+			'sortorder' => 'ASC',
+			'limit' => 2,
+			'page' => 1,
+			'status' => 1,
+			'properties' => '',
+		));
+
+		$this->assertSame(array(), $result);
+		$this->assertStringContainsString("t.entity IN (", $database->lastSql);
+		$this->assertStringContainsString('EXISTS (SELECT 1 FROM '.MAIN_DB_PREFIX.'societe_commerciaux AS sc', $database->lastSql);
+		$this->assertStringContainsString('sc.fk_user = 42', $database->lastSql);
+		$this->assertStringContainsString('t.status = 1', $database->lastSql);
+		$this->assertStringContainsString('ORDER BY t.nom ASC, t.rowid ASC', $database->lastSql);
+		$this->assertStringContainsString('LIMIT 2 OFFSET 2', $database->lastSql);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testNegativeThirdPartyPageIsRejected()
+	{
+		$this->expectException(RestException::class);
+		$this->service->validatePage('-1');
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testThirdPartyStatusValidation()
+	{
+		$this->assertSame(-1, $this->service->validateStatus('-1'));
+		$this->assertSame(0, $this->service->validateStatus(0));
+		$this->assertSame(1, $this->service->validateStatus('1'));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testInvalidThirdPartyStatusIsRejected()
+	{
+		$this->expectException(RestException::class);
+		$this->service->validateStatus('active');
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testThirdPartyBridgeUsesNativePropertyFiltering()
+	{
+		$object = new stdClass();
+		$object->id = 42;
+		$object->name = 'Assigned customer';
+		$object->note_private = 'must not be returned';
+		$bridge = new InvoicePlusThirdPartyApiBridge();
+
+		$result = $bridge->cleanAndFilter($object, 'id,name');
+
+		$this->assertSame(42, $result->id);
+		$this->assertSame('Assigned customer', $result->name);
+		$this->assertFalse(property_exists($result, 'note_private'));
 	}
 }

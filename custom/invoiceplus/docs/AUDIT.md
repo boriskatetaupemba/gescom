@@ -36,6 +36,30 @@ The base `_cleanObjectDatas()` removes database handles, internal implementation
 
 `Facture::fetch()` loads standard fields, extrafields and lines. `fetch_lines()` explicitly selects and assigns `facturedet.fk_warehouse`. Amount/date/multicurrency types therefore remain those of the installed native API.
 
+## Authenticated sales-representative third parties
+
+InvoicePlus 1.2.0 adds `GET /invoiceplus/thirdparties`. The caller cannot
+provide a user id: the predicate always uses the internal user authenticated by
+`DolibarrApiAccess`. Selection occurs before pagination and is constrained by
+the current Dolibarr entity context:
+
+```sql
+WHERE t.entity IN (getEntity('societe'))
+AND EXISTS (
+    SELECT 1
+    FROM MAIN_DB_PREFIX.societe_commerciaux sc
+    WHERE sc.fk_soc = t.rowid
+      AND sc.fk_user = <authenticated user id>
+)
+```
+
+`EXISTS` is intentional: the standard association table may contain more than
+one relationship type for a third-party/user pair, while the endpoint must
+return each third party once. The service creates a fresh `Societe` for every
+selected id and passes it through Dolibarr's native `_cleanObjectDatas()` and
+`_filterObjectProperties()` helpers, matching the core third-party list shape
+without changing core files. Empty selections return HTTP 200 with `[]`.
+
 ## InvoiceClosure audit and extraction
 
 Inspected custom files:

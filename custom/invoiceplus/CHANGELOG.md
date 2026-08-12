@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 - 2026-08-12
+
+- Add `GET /invoiceplus/thirdparties`, scoped exclusively to the sales
+  assignments of the authenticated internal API user.
+- Return native-compatible third-party list objects with entity filtering,
+  stable pagination, whitelisted sorting, status and property filters.
+- Reject external users and require the native third-party read right.
+
 ## 1.1.0 - 2026-08-11
 
 - Move the former core route `GET /invoices/byaccounts` to

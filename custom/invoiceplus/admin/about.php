@@ -49,7 +49,8 @@ print '<tr><td>'.$langs->trans('Description').'</td><td>'.$langs->trans('ModuleI
 print '<tr><td>'.$langs->trans('InvoicePlusApiEndpoint').'</td><td>';
 print '<code>/api/index.php/invoiceplus</code><br>';
 print '<code>/api/index.php/invoiceplus/byaccounts</code><br>';
-print '<code>/api/index.php/invoiceplus/warehouse/{warehouse_id}</code>';
+print '<code>/api/index.php/invoiceplus/warehouse/{warehouse_id}</code><br>';
+print '<code>/api/index.php/invoiceplus/thirdparties</code>';
 print '</td></tr>';
 print '</table>';
 print '<br><span class="opacitymedium">'.$langs->trans('InvoicePlusAboutArchitecture').'</span>';

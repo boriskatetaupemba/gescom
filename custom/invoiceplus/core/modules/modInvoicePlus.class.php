@@ -40,7 +40,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->descriptionlong = 'ModuleInvoicePlusDescLong';
 		$this->editor_name = 'InvoicePlus';
 		$this->editor_url = '';
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'bill';
 
@@ -63,7 +63,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->dirs = array('/invoiceplus/temp');
 		$this->config_page_url = array('setup.php@invoiceplus');
 		$this->hidden = false;
-		$this->depends = array('modApi', 'modFacture', 'modStock');
+		$this->depends = array('modApi', 'modSociete', 'modFacture', 'modStock');
 		$this->requiredby = array();
 		$this->conflictwith = array();
 		$this->langfiles = array('invoiceplus@invoiceplus');

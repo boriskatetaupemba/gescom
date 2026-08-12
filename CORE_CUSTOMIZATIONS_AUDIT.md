@@ -55,8 +55,9 @@ rajouter une méthode sous la base `/invoices`, ou d'injecter une propriété da
   `/bankauditapi/context`. La route exige les droits de lecture Stock et
   Banque/Caisse et contrôle l'accès à l'entrepôt. Le module dépend désormais
   explicitement des modules Banque/Caisse et Stock.
-- **InvoicePlus 1.1.0** : wrappers natifs, filtre par comptes, filtre par
-  entrepôt et ajout optionnel des informations InvoiceClosure.
+- **InvoicePlus 1.2.0** : wrappers natifs, filtres par comptes et entrepôt,
+  tiers affectés au commercial authentifié et ajout optionnel des informations
+  InvoiceClosure.
 - **InvoiceClosure** : reste la source métier canonique du statut et conserve
   ses routes `/invoiceclosureapi`.
 - **StockQuickMove 1.0.1** : page autonome, menu Produits > Entrepôts et hooks

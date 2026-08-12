@@ -69,6 +69,27 @@ if ($result.Code -eq 200) {
 	}
 }
 
+$result = Invoke-TestRequest "${RootEndpoint}/thirdparties?limit=2&page=0&properties=id,name"
+Assert-Status 'assigned third-party list' 200 $result
+if ($result.Code -eq 200) {
+	$payload = $result.Body | ConvertFrom-Json
+	$invalidObject = @($payload | Where-Object {
+		$propertyNames = @($_.PSObject.Properties.Name)
+		$propertyNames.Count -gt 2 -or
+		@($propertyNames | Where-Object { $_ -notin @('id', 'name') }).Count -gt 0
+	})
+	if ($result.Body.Trim().StartsWith('[') -and @($payload).Count -le 2 -and $invalidObject.Count -eq 0) {
+		Write-Host 'PASS  assigned third-party scope and properties' -ForegroundColor Green
+		$script:Passed++
+	} else {
+		Write-Host 'FAIL  assigned third-party scope and properties' -ForegroundColor Red
+		$script:Failed++
+	}
+}
+
+$result = Invoke-TestRequest "${RootEndpoint}/thirdparties?sortfield=t.unknown"
+Assert-Status 'invalid third-party sort field' 400 $result
+
 if ($AccountIds -ne '') {
 	$encodedAccountIds = [Uri]::EscapeDataString($AccountIds)
 	$result = Invoke-TestRequest "${RootEndpoint}/byaccounts?account_ids=$encodedAccountIds&limit=2"
