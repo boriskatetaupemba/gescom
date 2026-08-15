@@ -1,4 +1,4 @@
-# InvoicePlus 1.2.0
+# InvoicePlus 1.3.0
 
 InvoicePlus is an extensible Dolibarr module for customer-invoice services. It now owns every invoice API customization that previously lived in Dolibarr core:
 
@@ -10,9 +10,11 @@ GET /api/index.php/invoiceplus/ref_ext/{ref_ext}
 GET /api/index.php/invoiceplus/byaccounts?account_ids=1,2,3
 GET /api/index.php/invoiceplus/warehouse/{warehouse_id}
 GET /api/index.php/invoiceplus/thirdparties
+POST /api/index.php/invoiceplus/invoices/{invoice_id}/cash-settlement
+GET /api/index.php/invoiceplus/cash-settlements/{operation_id}
 ```
 
-The module delegates standard invoice construction and access checks to Dolibarr's native `Invoices` API, adds optional InvoiceClosure information itself, creates no table, and changes no Dolibarr core file. Native `/invoices` routes remain available with their stock 20.0.4 behavior.
+The module delegates standard invoice construction and access checks to Dolibarr's native `Invoices` API, adds optional InvoiceClosure information itself, and changes no Dolibarr core file. Version 1.3.0 adds one module-owned operation journal used to make cash-settlement retries atomic and idempotent. Native `/invoices` routes remain available with their stock 20.0.4 behavior.
 
 ## Verified target environment
 
@@ -35,7 +37,7 @@ The complete audit is in [docs/AUDIT.md](docs/AUDIT.md).
 1. Back up the Dolibarr database and custom modules directory.
 2. Extract `invoiceplus.zip` so the resulting path is `htdocs/custom/invoiceplus/`.
 3. Check that the web-server user can read the extracted files.
-4. In **Home > Setup > Modules/Applications**, enable REST API, Customer Invoices, Stocks, then Invoice Plus.
+4. In **Home > Setup > Modules/Applications**, enable REST API, Customer Invoices, Stocks, Banks/Cash and Multi-currency, then Invoice Plus. Re-enable Invoice Plus after upgrading so its 1.3.0 table is installed.
 5. Open Invoice Plus setup and review the five constants.
 6. If `API_PRODUCTION_MODE` is enabled, clear Dolibarr's REST/Restler cache or disable and re-enable the REST API module so the explorer is regenerated.
 
@@ -87,7 +89,70 @@ is not required because no invoice data is returned. It applies
 `getEntity('societe')`, so the `DOLAPIENTITY` header and configured entity
 sharing are respected. External users receive HTTP 403.
 
-The old custom paths cannot be retained by an external module because Dolibarr routes `/invoices` to its core API class. Clients must switch to the module paths above. Write operations remain on the native `/invoices` API; InvoiceClosure state is available separately from `/invoiceclosureapi`.
+The old custom paths cannot be retained by an external module because Dolibarr routes `/invoices` to its core API class. Clients must switch to the module paths above. Standard invoice writes remain on native `/invoices`; the atomic POS cash settlement is module-owned, and InvoiceClosure state remains available separately from `/invoiceclosureapi`.
+
+## Atomic CDF/USD cash settlement
+
+`POST /invoiceplus/invoices/{id}/cash-settlement` is the POS write boundary. It
+accepts CDF and/or USD received amounts and change in either currency. The
+client sends the invoice's frozen CDF-per-USD rate and current CDF remainder;
+the server compares both with the locked invoice, works in integer cents and
+rejects a stale or non-reconcilable request before creating any payment.
+
+```json
+{
+  "operation_id": "cash-20260812-0001",
+  "date": 1786492800,
+  "payment_method_id": 4,
+  "exchange_rate": "2850",
+  "total_cdf": "285000.00",
+  "received": { "cdf": "142500.00", "usd": "50.00" },
+  "change": { "cdf": "0.00", "usd": "0.00" },
+  "accounts": { "cdf": 8, "usd": 9 }
+}
+```
+
+The authenticated user must be internal and have `facture.lire`,
+`facture.creer`, `facture.paiement`, `banque.lire` and `banque.modifier`. A settlement that needs
+cross-currency change additionally requires `banque.transfer`. The server ignores any browser warehouse
+context and exclusively uses `user.fk_warehouse`. Every used account must be
+an open Dolibarr cash account, belong to the visible bank-account entity, have the exact USD/CDF
+currency, and be linked to that warehouse through
+`bank_account_extrafields.warehouse`. Account ledger rows are locked and the
+physical current balance (future-dated entries excluded) plus cash received must cover requested change.
+
+The invoice customer must be explicitly assigned to the authenticated sales
+representative in `societe_commerciaux`, even when that user has the global
+customer-view right. Every product/service line must explicitly carry that same
+warehouse; legacy or mixed-warehouse invoices are refused by this POS endpoint.
+
+The endpoint supports a company base currency of USD and a CDF invoice. It
+accepts only an active incoming `LIQ` payment method. Native `Paiement` records,
+payment/invoice links and bank lines are created for the exact tender
+allocation. When change crosses currencies, the service creates the two native
+linked bank-transfer lines required to preserve each cash drawer's physical
+delta. The invoice is marked paid only after both its USD and CDF remainders are
+exactly zero.
+
+Automatic invoice-PDF regeneration is disabled during the database transaction,
+then run once after commit. A document-generation failure is logged without
+rolling back or replaying a successful financial settlement.
+
+`operation_id` is mandatory and unique per Dolibarr entity. Replaying the exact
+normalized payload returns the saved result without a second payment. Reusing
+the key with different amounts, accounts, rate, date or invoice returns HTTP
+409. After a lost response, call
+`GET /invoiceplus/cash-settlements/{operation_id}`; only the creating user can
+retrieve the status. A completed GET returns the same settlement result at the
+response root with `idempotent_replay=true`.
+
+Module activation is fail-closed: InvoicePlus verifies both the settlement
+table and the exact unique `uk_invoiceplus_cash_operation(entity,
+operation_id)` key after loading SQL. Its `PAYMENT_CUSTOMER_CREATE` trigger also
+serializes native Dolibarr payments against processing/completed InvoicePlus
+operations. It uses locking reads and integer cents in both currencies; a
+native payment calculated from a stale balance is rolled back before it can
+overpay the protected invoice.
 
 All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero or negative value uses that configured maximum instead of producing an unbounded response.
 
@@ -125,7 +190,7 @@ All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero
 
 ## Security model
 
-All routes require authenticated REST access. Invoice routes require `facture.lire`; the warehouse route additionally requires `stock.lire` and applies the native stock resource check. The assigned-third-party route instead requires `societe.lire` and an internal user. Invoice and third-party selection use their native entity scopes, so `DOLAPIENTITY` follows Dolibarr's entity context.
+All routes require authenticated REST access. Invoice routes require `facture.lire`; the warehouse route additionally requires `stock.lire` and applies the native stock resource check. Cash settlement additionally requires `facture.creer`, `banque.lire`, an internal user, trusted server-side warehouse/account mappings and native per-invoice access. The assigned-third-party route instead requires `societe.lire` and an internal user. Invoice and third-party selection use their native entity scopes, so `DOLAPIENTITY` follows Dolibarr's entity context.
 
 On invoice routes, external users are forced to their own `socid`; internal users without the global customer-view permission are restricted through `societe_commerciaux`, matching the installed native invoice list. Every selected invoice passes through `Invoices::get()`, which applies `_checkAccessToResource('facture', id)` before returning data. The assigned-third-party route rejects external users and always applies the exact authenticated internal user id, regardless of global customer-view permission.
 
@@ -149,7 +214,7 @@ Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, `GET /wa
 
 ## Tests
 
-- Unit tests: run `phpunit test/unit/InvoicePlusInvoiceServiceTest.php` from the module directory with a PHPUnit release compatible with the installed PHP version. The legacy PEAR PHPUnit bundled with some XAMPP releases is not supported on PHP 8.
+- Unit tests: run `phpunit test/unit/InvoicePlusInvoiceServiceTest.php`, `phpunit test/unit/InvoicePlusCashSettlementServiceTest.php`, and `phpunit test/unit/InvoicePlusTriggersTest.php` from the module directory with a PHPUnit release compatible with the installed PHP version. The legacy PEAR PHPUnit bundled with some XAMPP releases is not supported on PHP 8.
 - PowerShell API suite: `test/api/test_invoiceplus_api.ps1`.
 - POSIX API suite: `test/api/test_invoiceplus_api.sh` (requires `curl` and `jq`).
 - Manual acceptance matrix: [test/MANUAL_TESTS.md](test/MANUAL_TESTS.md).

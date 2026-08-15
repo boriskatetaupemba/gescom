@@ -17,6 +17,7 @@ use Luracast\Restler\RestException;
 
 dol_include_once('/invoiceplus/class/invoiceplusinvoiceservice.class.php');
 dol_include_once('/invoiceplus/class/invoiceplusthirdpartyservice.class.php');
+dol_include_once('/invoiceplus/class/invoicepluscashsettlementservice.class.php');
 
 /**
  * InvoicePlus REST API.
@@ -32,6 +33,9 @@ class Invoiceplus extends DolibarrApi
 	/** @var InvoicePlusThirdPartyService */
 	private $thirdPartyService;
 
+	/** @var InvoicePlusCashSettlementService */
+	private $cashSettlementService;
+
 	/**
 	 * Constructor.
 	 */
@@ -42,6 +46,47 @@ class Invoiceplus extends DolibarrApi
 		$this->db = $db;
 		$this->invoiceService = null;
 		$this->thirdPartyService = null;
+		$this->cashSettlementService = null;
+	}
+
+	/**
+	 * Atomically settle a validated CDF invoice with CDF and/or USD cash.
+	 *
+	 * @param int   $id           Invoice id
+	 * @param array $request_data Complete settlement request
+	 * @return array              Completed settlement
+	 *
+	 * @url POST /invoices/{id}/cash-settlement
+	 *
+	 * @throws RestException 400 Invalid request
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 404 Invoice not found
+	 * @throws RestException 409 Stale or conflicting settlement
+	 * @throws RestException 422 Monetary reconciliation error
+	 * @throws RestException 500 Atomic settlement failure
+	 */
+	public function createCashSettlement($id, $request_data = null)
+	{
+		$this->assertInvoicePlusApiEnabled();
+		return $this->getCashSettlementService()->settle($id, $request_data);
+	}
+
+	/**
+	 * Return the status/result of a cash-settlement idempotency key.
+	 *
+	 * @param string $operation_id Client-generated idempotency key
+	 * @return array                Operation status and stored result/error
+	 *
+	 * @url GET /cash-settlements/{operation_id}
+	 *
+	 * @throws RestException 400 Invalid operation id
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 404 Operation not found
+	 */
+	public function getCashSettlement($operation_id)
+	{
+		$this->assertInvoicePlusApiEnabled();
+		return $this->getCashSettlementService()->getStatus($operation_id);
 	}
 
 	/**
@@ -442,6 +487,20 @@ class Invoiceplus extends DolibarrApi
 		}
 
 		return $this->thirdPartyService;
+	}
+
+	/**
+	 * Lazily create the authenticated cash-settlement service.
+	 *
+	 * @return InvoicePlusCashSettlementService
+	 */
+	private function getCashSettlementService()
+	{
+		if ($this->cashSettlementService === null) {
+			$this->cashSettlementService = new InvoicePlusCashSettlementService($this->db, DolibarrApiAccess::$user);
+		}
+
+		return $this->cashSettlementService;
 	}
 
 	/**

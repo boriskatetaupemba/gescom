@@ -2,6 +2,33 @@
 
 Replace the base URL, API key, and warehouse id.
 
+## Atomic mixed CDF/USD cash settlement
+
+```bash
+curl -X POST \
+  -H "DOLAPIKEY: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation_id":"cash-20260812-0001",
+    "date":1786492800,
+    "payment_method_id":4,
+    "exchange_rate":"2850",
+    "total_cdf":"285000.00",
+    "received":{"cdf":"142500.00","usd":"50.00"},
+    "change":{"cdf":"0.00","usd":"0.00"},
+    "accounts":{"cdf":8,"usd":9}
+  }' \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/invoices/123/cash-settlement"
+```
+
+Retry that exact body with the same `operation_id` after a timeout, or inspect
+the operation without creating anything:
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/cash-settlements/cash-20260812-0001"
+```
+
 ## Native-compatible list with InvoiceClosure enrichment
 
 ```bash

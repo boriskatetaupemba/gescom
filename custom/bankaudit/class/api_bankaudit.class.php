@@ -47,13 +47,17 @@ class BankAuditApi extends DolibarrApi
 	}
 
 	/**
-	 * Return the authenticated user's default warehouse and linked cash accounts.
+	 * Return the authenticated user's stable id, default warehouse and linked cash accounts.
 	 *
 	 * This endpoint replaces the former core customization of POST /login. A
 	 * client first obtains its token from the native login route, then calls
 	 * this endpoint with the DOLAPIKEY header.
 	 *
-	 * @return array User context containing a nullable default_warehouse property
+	 * The response never contains the DOLAPIKEY or any other authentication token.
+	 * `user_id` is the positive Dolibarr user row id and therefore remains stable
+	 * when the user's API key is renewed.
+	 *
+	 * @return array User context containing user_id and a nullable default_warehouse property
 	 *
 	 * @url GET /context
 	 *
@@ -64,6 +68,10 @@ class BankAuditApi extends DolibarrApi
 	{
 		$this->assertModuleEnabled();
 		$apiUser = DolibarrApiAccess::$user;
+		$userId = (int) $apiUser->id;
+		if ($userId <= 0) {
+			throw new RestException(403, 'A valid authenticated user identity is required.');
+		}
 		if (!$apiUser->hasRight('stock', 'lire') || !$apiUser->hasRight('banque', 'lire')) {
 			throw new RestException(403, 'Stock and bank-account read permissions are required.');
 		}
@@ -81,7 +89,10 @@ class BankAuditApi extends DolibarrApi
 			throw new RestException(503, 'Unable to read the user warehouse context.');
 		}
 
-		return array('default_warehouse' => $defaultWarehouse);
+		return array(
+			'user_id' => $userId,
+			'default_warehouse' => $defaultWarehouse,
+		);
 	}
 
 	/**

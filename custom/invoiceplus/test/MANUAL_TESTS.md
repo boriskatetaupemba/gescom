@@ -28,3 +28,14 @@ Run these checks on a disposable Dolibarr 20.0.4 test entity with API, Customer 
 24. Give U the global customer-view right and verify `/invoiceplus/thirdparties` is still restricted to A and C. Removing an assignment must remove the third party immediately.
 25. Verify `status=1`, `status=0`, `status=-1`, property filtering, stable pages and invalid sorting/status parameters. No assignment must return HTTP 200 with `[]`.
 26. Verify an external user and a user missing `societe.lire` receive HTTP 403. A user with `societe.lire` but without `facture.lire` must still access this route, and `DOLAPIENTITY` must never leak a third party from another entity.
+27. Re-enable InvoicePlus 1.3.0 and verify `llx_invoiceplus_cash_settlement` and its unique `(entity, operation_id)` index exist.
+28. Settle fresh validated CDF invoices with exact CDF, exact USD, and mixed CDF/USD. Verify native payment, `paiement_facture`, bank lines, invoice paid state, and the stored completed operation.
+29. Receive excess USD and return CDF, then receive excess CDF and return USD. Verify each case creates two reciprocal `banktransfert` URLs and that final CDF/USD account deltas equal received minus change.
+30. Replay the identical body and verify payment ids and bank-line ids are unchanged. Reuse the key with a changed cent, account, rate, date or invoice and verify HTTP 409 with no new ledger row.
+31. Send two concurrent requests with the same operation id, and then two different operation ids for one invoice. Verify at most one settlement commits and the invoice never receives excess payment.
+32. Verify stale total/rate, inactive or non-LIQ payment mode, closed/wrong-currency/wrong-warehouse account, external user, missing rights, and insufficient change all fail without payment or bank mutation.
+33. Drop the HTTP response after commit, call `GET /cash-settlements/{operation_id}`, and verify the creating user receives the stored result while another user receives 404.
+34. Force failures from the second payment, bank line, transfer link, invoice close and result update in a disposable environment; verify the outer transaction rolls back every payment, bank line and invoice status change.
+35. Hold a full InvoicePlus settlement before commit, start a native customer payment that calculated the old remainder, then release the InvoicePlus transaction. Verify the native `PAYMENT_CUSTOMER_CREATE` trigger rejects and rolls back the stale payment with no orphan `paiement`, `paiement_facture` or bank row.
+36. Repeat the race in reverse order. Verify the native payment commits first and InvoicePlus rejects the changed remainder without adding a second payment.
+37. Remove or alter `uk_invoiceplus_cash_operation` in a disposable database, then re-enable InvoicePlus. Activation must fail until the exact unique `(entity, operation_id)` key is restored.

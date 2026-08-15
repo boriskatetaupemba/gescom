@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.0 - 2026-08-12
+
+- Add atomic `POST /invoiceplus/invoices/{id}/cash-settlement` for CDF/USD
+  cash received and CDF/USD change.
+- Add `GET /invoiceplus/cash-settlements/{operation_id}` for safe recovery
+  after a timeout or lost HTTP response.
+- Freeze the invoice exchange rate, reconcile integer cents in both currencies,
+  validate server-side warehouse cash accounts and available change, and reject
+  stale invoice totals.
+- Create standard Dolibarr customer payments and linked cross-currency bank
+  transfers inside one outer transaction, closing the invoice only at an exact
+  zero balance.
+- Add a unique operation journal so concurrent retries execute once; identical
+  payloads replay the stored result and changed payloads return HTTP 409.
+- Add a transactional `PAYMENT_CUSTOMER_CREATE` safeguard: native Dolibarr
+  payments are serialized against protected InvoicePlus invoices and rolled
+  back if either the company-currency or invoice-currency total is exceeded.
+- Refuse module activation when SQL loading fails or when the settlement table
+  and exact unique `(entity, operation_id)` operation key cannot be verified.
+
 ## 1.2.0 - 2026-08-12
 
 - Add `GET /invoiceplus/thirdparties`, scoped exclusively to the sales
