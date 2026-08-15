@@ -1,0 +1,21 @@
+# InvoicePlus - Français
+ModuleInvoicePlusName=Invoice Plus
+ModuleInvoicePlusDesc=Services REST extensibles pour les factures clients
+ModuleInvoicePlusDescLong=InvoicePlus ajoute des services sécurisés et compatibles avec les factures clients natives sans modifier les fichiers du cœur Dolibarr.
+InvoicePlus=Invoice Plus
+InvoicePlusSetup=Configuration d'Invoice Plus
+InvoicePlusSetupDesc=Configurez les endpoints InvoicePlus pour les factures clients. Les changements s'appliquent à l'entité courante.
+InvoicePlusAbout=À propos d'Invoice Plus
+InvoicePlusApiEndpoint=Endpoint REST
+InvoicePlusAboutArchitecture=Les réponses sont construites par l'API native Invoices installée ; InvoicePlus sélectionne les factures, applique les filtres optionnels et peut ajouter les données InvoiceClosure du module.
+InvoicePlusInvalidMaxLimit=La limite maximale de l'API doit être comprise entre 1 et 10000.
+SetupINVOICEPLUS_API_ENABLED=Activer les endpoints REST
+SetupINVOICEPLUS_API_ENABLEDHelp=Lorsque cette option est désactivée, les appels REST InvoicePlus retournent HTTP 403.
+SetupINVOICEPLUS_MAX_API_LIMIT=Taille maximale d'une page API
+SetupINVOICEPLUS_MAX_API_LIMITHelp=Limite la valeur effective du paramètre limit. Une valeur demandée égale à zéro utilise également ce maximum.
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATA=Ajouter les métadonnées du filtre d'entrepôt
+SetupINVOICEPLUS_ADD_WAREHOUSE_METADATAHelp=Ajoute invoiceplus_warehouse_filter à chaque réponse ; cette propriété n'est jamais enregistrée.
+SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Ajouter les données InvoiceClosure
+SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Ajoute la propriété invoiceclosure via InvoicePlus lorsque InvoiceClosure est actif et que l'utilisateur API possède le droit de lecture.
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=Résoudre les associations d'entrepôt historiques
+SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKSHelp=Lorsque les lignes n'ont aucun entrepôt, utilise les mouvements de stock natifs, les tickets PosNova, la configuration du terminal TakePOS ou l'entrepôt lié au compte de caisse.

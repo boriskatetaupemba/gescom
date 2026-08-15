@@ -521,252 +521,32 @@ class InvoicePlusCashSettlementService
 		if ((int) $this->user->fk_warehouse <= 0) {
 			throw new RestException(403, 'The authenticated user has no default warehouse.');
 		}
-		$invoiceAccountId = (int) $invoice->fk_account;
-		$requestedCdfAccountId = (int) $normalized['accounts']['cdf'];
-		if ($invoiceAccountId <= 0 || $requestedCdfAccountId <= 0) {
-			throw new RestException(409, 'Invoice and settlement must identify the same CDF cash account.');
-		}
-		if ($invoiceAccountId !== $requestedCdfAccountId) {
-			throw new RestException(409, 'Requested CDF cash account does not match the invoice cash account.');
-		}
 
 		return $invoice;
 	}
 
-	/**
-	 * Prove that validation moved every stock-managed invoice product through
-	 * the authenticated user's warehouse.
-	 *
-	 * Facture::validate() consumes the warehouse passed to the validation call;
-	 * it does not persist that value reliably on facturedet.fk_warehouse. Native
-	 * stock movements linked to the invoice are therefore the authoritative
-	 * evidence. Net quantities are used so an unvalidate/revalidate cycle is
-	 * handled without accepting a remaining debit in another warehouse.
-	 */
+	/** Ensure the invoice belongs to the server-side warehouse context. */
 	private function validateInvoiceWarehouse($invoice, $warehouseId)
 	{
-		global $conf;
-
-		$warehouseId = (int) $warehouseId;
-		if ($warehouseId <= 0) {
-			throw new RestException(403, 'The authenticated user has no default warehouse.');
-		}
-
-		$sql = 'SELECT fd.rowid, fd.fk_product, fd.qty, fd.fk_warehouse';
+		$sql = 'SELECT';
+		$sql .= ' SUM(CASE WHEN fd.product_type IN (0, 1) THEN 1 ELSE 0 END) AS product_line_count,';
+		$sql .= ' SUM(CASE WHEN fd.product_type IN (0, 1) AND fd.fk_warehouse = '.((int) $warehouseId).' THEN 1 ELSE 0 END) AS matching_count';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'facturedet AS fd';
 		$sql .= ' WHERE fd.fk_facture = '.((int) $invoice->id);
-		$sql .= ' ORDER BY fd.rowid FOR UPDATE';
 		$result = $this->db->query($sql);
 		if (!$result) {
-			throw new RestException(503, 'Unable to read invoice stock requirements.');
+			throw new RestException(503, 'Unable to verify invoice warehouse.');
 		}
-
-		$invoiceLines = array();
-		$productIds = array();
-		while ($row = $this->db->fetch_object($result)) {
-			$productId = (int) $row->fk_product;
-			$lineWarehouseId = (int) $row->fk_warehouse;
-			if ($lineWarehouseId > 0 && $lineWarehouseId !== $warehouseId) {
-				$this->db->free($result);
-				throw new RestException(403, 'An invoice product line is assigned to a warehouse other than the authenticated user warehouse.');
-			}
-			$invoiceLines[] = array(
-				'id' => (int) $row->rowid,
-				'product_id' => $productId,
-				'quantity' => $row->qty,
-				'warehouse_id' => $lineWarehouseId,
-			);
-			if ($productId > 0) {
-				$productIds[$productId] = $productId;
-			}
-		}
+		$row = $this->db->fetch_object($result);
 		$this->db->free($result);
-
-		$productTypes = array();
-		if (!empty($productIds)) {
-			$sql = 'SELECT rowid, fk_product_type FROM '.MAIN_DB_PREFIX.'product';
-			$sql .= ' WHERE rowid IN ('.implode(',', $productIds).')';
-			$sql .= ' ORDER BY rowid FOR UPDATE';
-			$result = $this->db->query($sql);
-			if (!$result) {
-				throw new RestException(503, 'Unable to lock invoice product definitions.');
-			}
-			while ($row = $this->db->fetch_object($result)) {
-				$productTypes[(int) $row->rowid] = (int) $row->fk_product_type;
-			}
-			$this->db->free($result);
+		$productLineCount = $row ? (int) $row->product_line_count : 0;
+		$matching = $row ? (int) $row->matching_count : 0;
+		if ($productLineCount <= 0) {
+			throw new RestException(409, 'Invoice has no product line eligible for warehouse cash settlement.');
 		}
-
-		$requirements = array();
-		$lineIdsToBackfill = array();
-		foreach ($invoiceLines as $line) {
-			$productId = (int) $line['product_id'];
-			if ($productId <= 0) {
-				continue;
-			}
-			if (!array_key_exists($productId, $productTypes)) {
-				throw new RestException(409, 'Invoice references a product that no longer exists.');
-			}
-			$isStockManaged = $productId > 0
-				&& ($productTypes[$productId] !== 1 || !empty($conf->global->STOCK_SUPPORTS_SERVICES));
-			if (!$isStockManaged) {
-				continue;
-			}
-			if ((int) $line['warehouse_id'] <= 0) {
-				$lineIdsToBackfill[] = (int) $line['id'];
-			}
-			if (!isset($requirements[$productId])) {
-				$requirements[$productId] = array('quantity_units' => 0, 'line_count' => 0);
-			}
-			$requirements[$productId]['quantity_units'] = $this->addQuantityUnits(
-				$requirements[$productId]['quantity_units'],
-				$this->quantityToUnits($line['quantity'])
-			);
-			$requirements[$productId]['line_count']++;
+		if ($matching !== $productLineCount) {
+			throw new RestException(403, 'Every invoice product line must have the authenticated user warehouse assigned.');
 		}
-		if (empty($requirements)) {
-			throw new RestException(409, 'Invoice has no stock-managed product line eligible for warehouse cash settlement.');
-		}
-
-		// Lock the native evidence while the invoice row is already locked by the
-		// settlement transaction. Legitimate validate/unvalidate paths serialize
-		// through that invoice lock, while this lock also protects existing rows.
-		$sql = 'SELECT rowid, fk_product, fk_entrepot, value, type_mouvement';
-		$sql .= ' FROM '.MAIN_DB_PREFIX.'stock_mouvement';
-		$sql .= ' WHERE fk_origin = '.((int) $invoice->id);
-		$sql .= " AND origintype = 'facture'";
-		$sql .= ' ORDER BY rowid FOR UPDATE';
-		$result = $this->db->query($sql);
-		if (!$result) {
-			throw new RestException(503, 'Unable to lock invoice stock-movement evidence.');
-		}
-
-		$movements = array();
-		while ($row = $this->db->fetch_object($result)) {
-			$movements[] = array(
-				'product_id' => (int) $row->fk_product,
-				'warehouse_id' => (int) $row->fk_entrepot,
-				'quantity_units' => $this->quantityToUnits($row->value),
-				'type' => (int) $row->type_mouvement,
-			);
-		}
-		$this->db->free($result);
-
-		$this->assertWarehouseMovementProof($requirements, $movements, $warehouseId);
-
-		// Repair only legacy missing metadata and only after the authoritative
-		// movement proof succeeded. A conflicting non-zero assignment is never
-		// overwritten. The update is part of the outer settlement transaction.
-		if (!empty($lineIdsToBackfill)) {
-			$sql = 'UPDATE '.MAIN_DB_PREFIX.'facturedet';
-			$sql .= ' SET fk_warehouse = '.$warehouseId;
-			$sql .= ' WHERE fk_facture = '.((int) $invoice->id);
-			$sql .= ' AND rowid IN ('.implode(',', $lineIdsToBackfill).')';
-			$sql .= ' AND (fk_warehouse IS NULL OR fk_warehouse = 0)';
-			$result = $this->db->query($sql);
-			if (!$result || $this->db->affected_rows($result) !== count($lineIdsToBackfill)) {
-				throw new RestException(503, 'Unable to persist verified invoice warehouse metadata.');
-			}
-		}
-	}
-
-	/**
-	 * Validate an exact, net stock-movement proof using quantities scaled to
-	 * eight decimal places (the precision of Dolibarr stock quantities).
-	 *
-	 * @param array $requirements Required invoice quantity by product
-	 * @param array $movements    Native stock movements linked to the invoice
-	 * @param int   $warehouseId  Authenticated user's warehouse
-	 * @return void
-	 */
-	private function assertWarehouseMovementProof(array $requirements, array $movements, $warehouseId)
-	{
-		$netByProductWarehouse = array();
-		$movementCountByProduct = array();
-		foreach ($movements as $movement) {
-			$productId = (int) $movement['product_id'];
-			$movementWarehouseId = (int) $movement['warehouse_id'];
-			$type = (int) $movement['type'];
-			if ($productId <= 0 || $movementWarehouseId <= 0 || !in_array($type, array(2, 3), true)) {
-				throw new RestException(409, 'Invoice stock-movement evidence contains an unexpected native movement.');
-			}
-			if (!isset($netByProductWarehouse[$productId])) {
-				$netByProductWarehouse[$productId] = array();
-				$movementCountByProduct[$productId] = 0;
-			}
-			if (!isset($netByProductWarehouse[$productId][$movementWarehouseId])) {
-				$netByProductWarehouse[$productId][$movementWarehouseId] = 0;
-			}
-			$netByProductWarehouse[$productId][$movementWarehouseId] = $this->addQuantityUnits(
-				$netByProductWarehouse[$productId][$movementWarehouseId],
-				(int) $movement['quantity_units']
-			);
-			$movementCountByProduct[$productId]++;
-		}
-
-		// A fully reversed historical movement in another warehouse is harmless;
-		// any non-zero remaining quantity there proves the invoice is outside the
-		// authenticated warehouse context and must fail closed.
-		foreach ($netByProductWarehouse as $warehouseTotals) {
-			foreach ($warehouseTotals as $movementWarehouseId => $quantityUnits) {
-				if ((int) $movementWarehouseId !== (int) $warehouseId && (int) $quantityUnits !== 0) {
-					throw new RestException(403, 'Invoice stock was moved through a warehouse other than the authenticated user warehouse.');
-				}
-			}
-		}
-
-		foreach ($requirements as $productId => $requirement) {
-			$productId = (int) $productId;
-			$expectedMovement = 0 - (int) $requirement['quantity_units'];
-			$actualMovement = isset($netByProductWarehouse[$productId][$warehouseId])
-				? (int) $netByProductWarehouse[$productId][$warehouseId]
-				: 0;
-			if (empty($movementCountByProduct[$productId]) || $actualMovement !== $expectedMovement) {
-				throw new RestException(409, 'Invoice stock exit from the authenticated user warehouse cannot be proven.');
-			}
-		}
-	}
-
-	/** Convert a Dolibarr quantity to an exact signed 1e-8 integer. */
-	private function quantityToUnits($value)
-	{
-		$string = trim((string) $value);
-		if (!preg_match('/^-?[0-9]+(?:\.[0-9]{1,8})?$/', $string)) {
-			if (!is_numeric($value)) {
-				throw new RestException(503, 'Invalid quantity in invoice stock evidence.');
-			}
-			$numeric = (float) $value;
-			if (!is_finite($numeric)) {
-				throw new RestException(503, 'Invalid quantity in invoice stock evidence.');
-			}
-			$string = number_format($numeric, 8, '.', '');
-		}
-
-		$negative = isset($string[0]) && $string[0] === '-';
-		if ($negative) {
-			$string = substr($string, 1);
-		}
-		$parts = explode('.', $string, 2);
-		$whole = ltrim($parts[0], '0');
-		$whole = ($whole === '') ? '0' : $whole;
-		if (strlen($whole) > 10) {
-			throw new RestException(503, 'Quantity in invoice stock evidence exceeds the supported exact range.');
-		}
-		$decimal = isset($parts[1]) ? str_pad($parts[1], 8, '0') : '00000000';
-		$units = ((int) $whole * 100000000) + (int) $decimal;
-		return $negative ? (0 - $units) : $units;
-	}
-
-	/** Add scaled quantities while failing closed instead of overflowing. */
-	private function addQuantityUnits($left, $right)
-	{
-		$left = (int) $left;
-		$right = (int) $right;
-		if (($right > 0 && $left > PHP_INT_MAX - $right)
-			|| ($right < 0 && $left < PHP_INT_MIN - $right)) {
-			throw new RestException(503, 'Quantity total in invoice stock evidence exceeds the supported exact range.');
-		}
-		return $left + $right;
 	}
 
 	/** Return exact remaining values in cents for both invoice currencies. */
