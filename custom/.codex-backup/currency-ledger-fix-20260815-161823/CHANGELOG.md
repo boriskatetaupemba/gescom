@@ -1,24 +1,5 @@
 # Changelog
 
-## 1.3.2 - 2026-08-15
-
-- Replace the separate physical-cash block with an upgrade-safe, idempotent
-  enrichment of Dolibarr's native invoice payment table.
-- Insert the physical cash-account amount immediately before the native company-
-  currency Amount column, while preserving payment ids and summary alignment.
-- Map only exact CDF/USD payment references backed by a completed settlement
-  journal for the same Dolibarr entity and invoice, with a suffix that matches
-  the cash-account currency.
-
-## 1.3.1 - 2026-08-15
-
-- Prove the invoice warehouse from exact native stock movements and backfill
-  only verified legacy missing line metadata inside the transaction.
-- Reconcile each created payment through its invoice link, bank line and account
-  currency; expose physical cash versus company-currency equivalent explicitly.
-- Add an upgrade-safe invoice-card hook showing physical CDF/USD tender amounts
-  alongside their company-currency equivalents without changing core files.
-
 ## 1.3.0 - 2026-08-12
 
 - Add atomic `POST /invoiceplus/invoices/{id}/cash-settlement` for CDF/USD

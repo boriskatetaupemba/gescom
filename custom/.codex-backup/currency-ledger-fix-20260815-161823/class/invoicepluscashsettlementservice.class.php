@@ -925,8 +925,6 @@ class InvoicePlusCashSettlementService
 	/** Create a native customer payment and its native bank line. */
 	private function createPayment($invoice, $currency, $amountCents, $accountId, array $paymentMode, array $normalized)
 	{
-		global $conf;
-
 		$payment = new Paiement($this->db);
 		$payment->datepaye = $normalized['date'];
 		$payment->paiementid = $paymentMode['id'];
@@ -964,15 +962,6 @@ class InvoicePlusCashSettlementService
 			dol_syslog(__METHOD__.' '.$payment->error, LOG_ERR);
 			throw new RestException(500, 'Unable to add '.$currency.' payment to its cash account.');
 		}
-		$ledgerProof = $this->loadAndValidatePaymentLedgerProof(
-			(int) $invoice->id,
-			(int) $paymentId,
-			(int) $bankLineId,
-			(int) $accountId,
-			$currency,
-			(int) $amountCents,
-			$normalized['exchange_rate']
-		);
 		return array(
 			'id' => (int) $paymentId,
 			'bank_line_id' => (int) $bankLineId,
@@ -980,107 +969,7 @@ class InvoicePlusCashSettlementService
 			'amount' => $this->centsToDecimal($amountCents),
 			'account_id' => (int) $accountId,
 			'ref_ext' => $externalRef,
-			'ledger' => array(
-				'account_amount' => $this->centsToDecimal($ledgerProof['bank_amount_cents']),
-				'account_currency' => $currency,
-				'company_amount' => $this->centsToDecimal($ledgerProof['payment_base_cents']),
-				'company_currency' => strtoupper((string) $conf->currency),
-			),
 		);
-	}
-
-	/**
-	 * Lock and prove the native payment, invoice allocation and cash-account
-	 * ledger row immediately after Dolibarr created them.
-	 */
-	private function loadAndValidatePaymentLedgerProof($invoiceId, $paymentId, $bankLineId, $accountId, $currency, $amountCents, $exchangeRate)
-	{
-		$sql = 'SELECT p.rowid AS payment_id, p.amount AS payment_base, p.multicurrency_amount AS payment_foreign, p.fk_bank,';
-		$sql .= ' pf.amount AS link_base, pf.multicurrency_amount AS link_foreign, pf.multicurrency_code AS link_currency, pf.multicurrency_tx AS link_rate,';
-		$sql .= ' b.rowid AS bank_line_id, b.amount AS bank_amount, b.amount_main_currency AS bank_main, b.fk_account,';
-		$sql .= ' ba.currency_code AS account_currency';
-		$sql .= ' FROM '.MAIN_DB_PREFIX.'paiement AS p';
-		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'paiement_facture AS pf ON pf.fk_paiement = p.rowid';
-		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'bank AS b ON b.rowid = p.fk_bank';
-		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'bank_account AS ba ON ba.rowid = b.fk_account';
-		$sql .= ' WHERE p.rowid = '.((int) $paymentId);
-		$sql .= ' AND p.entity = '.((int) $this->entity);
-		$sql .= ' AND pf.fk_facture = '.((int) $invoiceId);
-		$sql .= ' AND b.rowid = '.((int) $bankLineId);
-		$sql .= ' AND b.fk_account = '.((int) $accountId);
-		$sql .= ' AND ba.entity IN ('.getEntity('bank_account').') FOR UPDATE';
-		$result = $this->db->query($sql);
-		if (!$result) {
-			throw new RestException(503, 'Unable to lock the created cash-payment ledger proof.');
-		}
-		if ($this->db->num_rows($result) !== 1) {
-			$this->db->free($result);
-			throw new RestException(500, 'Created cash payment has no unique native ledger proof. No settlement was committed.');
-		}
-		$row = $this->db->fetch_object($result);
-		$this->db->free($result);
-
-		$proof = array(
-			'payment_id' => (int) $row->payment_id,
-			'bank_line_id' => (int) $row->bank_line_id,
-			'account_id' => (int) $row->fk_account,
-			'account_currency' => strtoupper((string) $row->account_currency),
-			'payment_base_cents' => $this->storedMoneyToCents($row->payment_base, 'payment.amount'),
-			'payment_foreign_cents' => $this->storedMoneyToCents($row->payment_foreign, 'payment.multicurrency_amount'),
-			'link_base_cents' => $this->storedMoneyToCents($row->link_base, 'payment_invoice.amount'),
-			'link_foreign_cents' => $this->storedMoneyToCents($row->link_foreign, 'payment_invoice.multicurrency_amount'),
-			'link_currency' => strtoupper((string) $row->link_currency),
-			'link_rate' => (float) $row->link_rate,
-			'bank_amount_cents' => $this->storedMoneyToCents($row->bank_amount, 'bank.amount'),
-			'bank_main_cents' => $this->storedMoneyToCents($row->bank_main, 'bank.amount_main_currency', true),
-		);
-		$this->assertPaymentLedgerProof(
-			$proof,
-			(int) $paymentId,
-			(int) $bankLineId,
-			(int) $accountId,
-			$currency,
-			(int) $amountCents,
-			(float) $exchangeRate
-		);
-		return $proof;
-	}
-
-	/** Validate the pure monetary invariants of one native payment ledger proof. */
-	private function assertPaymentLedgerProof(array $proof, $paymentId, $bankLineId, $accountId, $currency, $amountCents, $exchangeRate)
-	{
-		$currency = strtoupper((string) $currency);
-		$valid = (int) $proof['payment_id'] === (int) $paymentId
-			&& (int) $proof['bank_line_id'] === (int) $bankLineId
-			&& (int) $proof['account_id'] === (int) $accountId
-			&& (string) $proof['account_currency'] === $currency
-			&& (int) $proof['payment_base_cents'] > 0
-			&& (int) $proof['payment_foreign_cents'] > 0
-			&& (int) $proof['link_base_cents'] === (int) $proof['payment_base_cents']
-			&& (int) $proof['link_foreign_cents'] === (int) $proof['payment_foreign_cents']
-			&& (string) $proof['link_currency'] === 'CDF'
-			&& is_finite((float) $proof['link_rate'])
-			&& abs((float) $proof['link_rate'] - (float) $exchangeRate) <= 0.00000001;
-
-		if ($currency === 'CDF') {
-			$valid = $valid
-				&& (int) $proof['payment_foreign_cents'] === (int) $amountCents
-				&& (int) $proof['bank_amount_cents'] === (int) $amountCents
-				&& $proof['bank_main_cents'] !== null
-				&& (int) $proof['bank_main_cents'] === (int) $proof['payment_base_cents'];
-		} elseif ($currency === 'USD') {
-			$valid = $valid
-				&& (int) $proof['payment_base_cents'] === (int) $amountCents
-				&& (int) $proof['bank_amount_cents'] === (int) $amountCents
-				&& $proof['bank_main_cents'] === null;
-		} else {
-			$valid = false;
-		}
-
-		if (!$valid) {
-			dol_syslog(__METHOD__.' payment='.$paymentId.' bank_line='.$bankLineId.' account='.$accountId.' currency='.$currency.' native cash ledger mismatch', LOG_ERR);
-			throw new RestException(500, 'Created cash payment failed native currency-ledger reconciliation. No settlement was committed.');
-		}
 	}
 
 	/** Create the two linked bank lines required by a cross-currency exchange. */
@@ -1442,26 +1331,6 @@ class InvoicePlusCashSettlementService
 			$total -= (int) round(((float) $value) * 100);
 		}
 		return $total;
-	}
-
-	/** Convert one native stored monetary value to exact cents. */
-	private function storedMoneyToCents($value, $field, $allowNull = false)
-	{
-		if ($value === null) {
-			if ($allowNull) {
-				return null;
-			}
-			throw new RestException(500, $field.' is missing from the native cash ledger.');
-		}
-		if (!is_numeric($value)) {
-			throw new RestException(500, $field.' is invalid in the native cash ledger.');
-		}
-		$numeric = (float) $value;
-		$scaled = $numeric * 100;
-		if (!is_finite($numeric) || !is_finite($scaled) || abs($scaled - round($scaled)) > 0.000001 || abs($scaled) > PHP_INT_MAX) {
-			throw new RestException(500, $field.' cannot be represented as exact cents in the native cash ledger.');
-		}
-		return (int) round($scaled);
 	}
 
 	/** Format signed cents without floating-point arithmetic. */

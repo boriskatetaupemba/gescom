@@ -40,7 +40,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->descriptionlong = 'ModuleInvoicePlusDescLong';
 		$this->editor_name = 'InvoicePlus';
 		$this->editor_url = '';
-		$this->version = '1.3.2';
+		$this->version = '1.3.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'bill';
 
@@ -56,7 +56,7 @@ class modInvoicePlus extends DolibarrModules
 			'theme' => 0,
 			'css' => array(),
 			'js' => array(),
-			'hooks' => array('invoicecard'),
+			'hooks' => array(),
 			'moduleforexternal' => 0,
 		);
 

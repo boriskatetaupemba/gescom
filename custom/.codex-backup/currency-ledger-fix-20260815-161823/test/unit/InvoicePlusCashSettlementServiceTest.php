@@ -83,16 +83,6 @@ class InvoicePlusCashSettlementServiceTest extends TestCase
 	}
 
 	/** @return void */
-	public function testExactInvoice248MixedAllocationNeedsNoTransfer()
-	{
-		$result = $this->service->allocatePayments(42750000, 15000, 2850.0, 14250000, 10000);
-
-		$this->assertSame(14250000, $result['payment_cdf_cents']);
-		$this->assertSame(10000, $result['payment_usd_cents']);
-		$this->assertNull($result['transfer']);
-	}
-
-	/** @return void */
 	public function testUsdOverTenderAndCdfChangeCreateCdfToUsdTransfer()
 	{
 		// $200 received, CDF 285,000 returned, invoice total USD 100.
@@ -192,89 +182,12 @@ class InvoicePlusCashSettlementServiceTest extends TestCase
 		$this->invokeWarehouseProof($requirements, array(), 3);
 	}
 
-	/** @return void */
-	public function testCdfPaymentLedgerProofKeepsPhysicalAndBaseAmountsDistinct()
-	{
-		$this->invokePaymentLedgerProof($this->validPaymentLedgerProof('CDF'), 'CDF', 14250000);
-		$this->addToAssertionCount(1);
-	}
-
-	/** @return void */
-	public function testUsdPaymentLedgerProofUsesBaseAccountAmount()
-	{
-		$this->invokePaymentLedgerProof($this->validPaymentLedgerProof('USD'), 'USD', 10000);
-		$this->addToAssertionCount(1);
-	}
-
-	/** @return void */
-	public function testCdfPaymentLedgerProofRejectsBaseAmountPostedAsPhysicalCash()
-	{
-		$proof = $this->validPaymentLedgerProof('CDF');
-		$proof['bank_amount_cents'] = 5000;
-
-		$this->expectException(RestException::class);
-		$this->invokePaymentLedgerProof($proof, 'CDF', 14250000);
-	}
-
-	/** @return void */
-	public function testPaymentLedgerProofRejectsInvoiceAllocationMismatch()
-	{
-		$proof = $this->validPaymentLedgerProof('USD');
-		$proof['link_foreign_cents']--;
-
-		$this->expectException(RestException::class);
-		$this->invokePaymentLedgerProof($proof, 'USD', 10000);
-	}
-
 	/** Invoke the private pure proof checker without touching the database. */
 	private function invokeWarehouseProof(array $requirements, array $movements, $warehouseId)
 	{
 		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'assertWarehouseMovementProof');
 		$method->setAccessible(true);
 		$method->invoke($this->service, $requirements, $movements, $warehouseId);
-	}
-
-	/** Invoke the private pure native-ledger checker without database writes. */
-	private function invokePaymentLedgerProof(array $proof, $currency, $amountCents)
-	{
-		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'assertPaymentLedgerProof');
-		$method->setAccessible(true);
-		$method->invoke($this->service, $proof, 27, 76, $currency === 'CDF' ? 9 : 8, $currency, $amountCents, 2850.0);
-	}
-
-	/** Native values expected for one half-CDF / two-thirds-USD mixed tender. */
-	private function validPaymentLedgerProof($currency)
-	{
-		if ($currency === 'CDF') {
-			return array(
-				'payment_id' => 27,
-				'bank_line_id' => 76,
-				'account_id' => 9,
-				'account_currency' => 'CDF',
-				'payment_base_cents' => 5000,
-				'payment_foreign_cents' => 14250000,
-				'link_base_cents' => 5000,
-				'link_foreign_cents' => 14250000,
-				'link_currency' => 'CDF',
-				'link_rate' => 2850.0,
-				'bank_amount_cents' => 14250000,
-				'bank_main_cents' => 5000,
-			);
-		}
-		return array(
-			'payment_id' => 27,
-			'bank_line_id' => 76,
-			'account_id' => 8,
-			'account_currency' => 'USD',
-			'payment_base_cents' => 10000,
-			'payment_foreign_cents' => 28500000,
-			'link_base_cents' => 10000,
-			'link_foreign_cents' => 28500000,
-			'link_currency' => 'CDF',
-			'link_rate' => 2850.0,
-			'bank_amount_cents' => 10000,
-			'bank_main_cents' => null,
-		);
 	}
 
 	/** @return array */

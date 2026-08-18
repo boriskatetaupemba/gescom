@@ -1,15 +1,5 @@
 # Changelog
 
-## 1.3.2 - 2026-08-15
-
-- Replace the separate physical-cash block with an upgrade-safe, idempotent
-  enrichment of Dolibarr's native invoice payment table.
-- Insert the physical cash-account amount immediately before the native company-
-  currency Amount column, while preserving payment ids and summary alignment.
-- Map only exact CDF/USD payment references backed by a completed settlement
-  journal for the same Dolibarr entity and invoice, with a suffix that matches
-  the cash-account currency.
-
 ## 1.3.1 - 2026-08-15
 
 - Prove the invoice warehouse from exact native stock movements and backfill

@@ -123,12 +123,8 @@ physical current balance (future-dated entries excluded) plus cash received must
 
 The invoice customer must be explicitly assigned to the authenticated sales
 representative in `societe_commerciaux`, even when that user has the global
-customer-view right. Native invoice-origin stock movements are the authoritative
-warehouse proof: their exact net product quantities must match the invoice in
-the user's warehouse, with no remaining movement in another warehouse. A
-conflicting positive line warehouse is refused; legacy stock-managed lines with
-`fk_warehouse` missing are backfilled only after the proof succeeds and inside
-the settlement transaction.
+customer-view right. Every product/service line must explicitly carry that same
+warehouse; legacy or mixed-warehouse invoices are refused by this POS endpoint.
 
 The endpoint supports a company base currency of USD and a CDF invoice. It
 accepts only an active incoming `LIQ` payment method. Native `Paiement` records,
@@ -137,24 +133,6 @@ allocation. When change crosses currencies, the service creates the two native
 linked bank-transfer lines required to preserve each cash drawer's physical
 delta. The invoice is marked paid only after both its USD and CDF remainders are
 exactly zero.
-
-After every `addPaymentToBank()`, InvoicePlus locks and reconciles the native
-`paiement`, `paiement_facture`, `bank`, and `bank_account` rows. On a CDF cash
-account, `bank.amount` is the physical CDF amount and
-`bank.amount_main_currency` is its USD equivalent; `paiement.amount` remains the
-standard Dolibarr company-currency amount. Any mismatch rolls back the complete
-settlement. The additive `payments.*.ledger` response block exposes both values.
-The non-core `invoicecard` hook enriches Dolibarr's existing Payments table with
-one **Physical amount** column immediately before its native **Amount** column.
-Rows are matched by native payment id: the added value is `bank.amount` in the
-cash-account currency, while the unchanged native value remains the company-
-currency allocation. The hook adds no duplicate table or explanatory block,
-keeps non-InvoicePlus payment rows aligned with an em dash, and
-extends native summary colspans without inventing a cross-currency total.
-Only payments whose exact `invoiceplus:{operation_id}:cdf|usd` reference matches
-a completed settlement journal for the same entity and invoice are mapped. The
-suffix must also match the cash-account currency exactly (`cdf`/CDF or
-`usd`/USD); every other currency fails closed.
 
 Automatic invoice-PDF regeneration is disabled during the database transaction,
 then run once after commit. A document-generation failure is logged without

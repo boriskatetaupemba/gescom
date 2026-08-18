@@ -144,17 +144,9 @@ account, `bank.amount` is the physical CDF amount and
 `bank.amount_main_currency` is its USD equivalent; `paiement.amount` remains the
 standard Dolibarr company-currency amount. Any mismatch rolls back the complete
 settlement. The additive `payments.*.ledger` response block exposes both values.
-The non-core `invoicecard` hook enriches Dolibarr's existing Payments table with
-one **Physical amount** column immediately before its native **Amount** column.
-Rows are matched by native payment id: the added value is `bank.amount` in the
-cash-account currency, while the unchanged native value remains the company-
-currency allocation. The hook adds no duplicate table or explanatory block,
-keeps non-InvoicePlus payment rows aligned with an em dash, and
-extends native summary colspans without inventing a cross-currency total.
-Only payments whose exact `invoiceplus:{operation_id}:cdf|usd` reference matches
-a completed settlement journal for the same entity and invoice are mapped. The
-suffix must also match the cash-account currency exactly (`cdf`/CDF or
-`usd`/USD); every other currency fails closed.
+The non-core `invoicecard` hook shows the same physical/equivalent distinction
+on the native invoice card because Dolibarr's standard Payments table displays
+the company-currency allocation.
 
 Automatic invoice-PDF regeneration is disabled during the database transaction,
 then run once after commit. A document-generation failure is logged without

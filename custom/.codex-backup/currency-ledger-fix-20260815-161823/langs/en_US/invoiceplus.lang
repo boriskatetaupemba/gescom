@@ -19,4 +19,3 @@ SetupINVOICEPLUS_LOAD_CLOSURE_DATA=Add InvoiceClosure data
 SetupINVOICEPLUS_LOAD_CLOSURE_DATAHelp=Adds the invoiceclosure property through InvoicePlus when InvoiceClosure is enabled and the API user is authorized.
 SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKS=Resolve legacy warehouse associations
 SetupINVOICEPLUS_ENABLE_WAREHOUSE_FALLBACKSHelp=When invoice lines have no warehouse, use native stock movements, PosNova tickets, TakePOS terminal configuration, or the linked cash account warehouse.
-InvoicePlusPhysicalAmount=Physical amount
