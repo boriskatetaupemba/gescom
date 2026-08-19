@@ -1,4 +1,4 @@
-# InvoicePlus 1.3.0
+# InvoicePlus 1.3.4
 
 InvoicePlus is an extensible Dolibarr module for customer-invoice services. It now owns every invoice API customization that previously lived in Dolibarr core:
 
@@ -105,21 +105,24 @@ rejects a stale or non-reconcilable request before creating any payment.
   "date": 1786492800,
   "payment_method_id": 4,
   "exchange_rate": "2850",
-  "total_cdf": "285000.00",
-  "received": { "cdf": "142500.00", "usd": "50.00" },
-  "change": { "cdf": "0.00", "usd": "0.00" },
+  "total_cdf": "342000.00",
+  "received": { "cdf": "0.00", "usd": "150.00" },
+  "change": { "cdf": "0.00", "usd": "30.00" },
   "accounts": { "cdf": 8, "usd": 9 }
 }
 ```
 
 The authenticated user must be internal and have `facture.lire`,
-`facture.creer`, `facture.paiement`, `banque.lire` and `banque.modifier`. A settlement that needs
-cross-currency change additionally requires `banque.transfer`. The server ignores any browser warehouse
-context and exclusively uses `user.fk_warehouse`. Every used account must be
+`facture.creer`, `facture.paiement`, `banque.lire` and `banque.modifier`. The
+server ignores any browser warehouse context and exclusively uses
+`user.fk_warehouse`. Every used account must be
 an open Dolibarr cash account, belong to the visible bank-account entity, have the exact USD/CDF
 currency, and be linked to that warehouse through
 `bank_account_extrafields.warehouse`. Account ledger rows are locked and the
-physical current balance (future-dated entries excluded) plus cash received must cover requested change.
+non-negative physical current balance (future-dated entries excluded), plus
+cash received by the current settlement, must cover requested change. A
+negative historical ledger balance never consumes cash physically received in
+the current sale.
 
 The invoice customer must be explicitly assigned to the authenticated sales
 representative in `societe_commerciaux`, even when that user has the global
@@ -133,14 +136,24 @@ the settlement transaction.
 The endpoint supports a company base currency of USD and a CDF invoice. It
 accepts only an active incoming `LIQ` payment method. Native `Paiement` records,
 payment/invoice links and bank lines are created for the exact tender
-allocation. When change crosses currencies, the service creates the two native
-linked bank-transfer lines required to preserve each cash drawer's physical
-delta. The invoice is marked paid only after both its USD and CDF remainders are
-exactly zero.
+allocation. The physical cash ledger is independent of that allocation: for
+each used currency, it contains one positive row equal to the full amount
+received and, when applicable, one negative row equal to the full amount
+returned. No compensating or cross-currency transfer rows are exposed. The
+invoice is marked paid only after both its USD and CDF remainders are exactly
+zero.
+
+Every physical row has a user-facing French label such as
+`Paiement reçu 150,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI`
+or `Monnaie rendue 30,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI`.
+It is linked to both the invoice and customer. The response exposes exact gross
+amounts and native row ids in `cash_movements.cdf|usd`; the legacy `transfer`
+field is always `null` for newly completed settlements.
 
 After every `addPaymentToBank()`, InvoicePlus locks and reconciles the native
-`paiement`, `paiement_facture`, `bank`, and `bank_account` rows. On a CDF cash
-account, `bank.amount` is the physical CDF amount and
+`paiement`, `paiement_facture`, `bank`, and `bank_account` rows, then rewrites
+the linked bank row to the gross amount physically received and proves it
+again with any returned-change row. On a CDF cash account, `bank.amount` is the physical CDF amount and
 `bank.amount_main_currency` is its USD equivalent; `paiement.amount` remains the
 standard Dolibarr company-currency amount. Any mismatch rolls back the complete
 settlement. The additive `payments.*.ledger` response block exposes both values.

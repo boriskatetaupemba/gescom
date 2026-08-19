@@ -107,13 +107,10 @@ class InvoicePlusCashSettlementService
 				$netCdf,
 				$netUsd
 			);
-			if ($allocation['transfer'] !== null && !$this->user->hasRight('banque', 'transfer')) {
-				throw new RestException(403, 'Bank transfer permission is required for cross-currency change.');
-			}
 
 			$warehouseId = (int) $this->user->fk_warehouse;
 			$this->validateInvoiceWarehouse($invoice, $warehouseId);
-			$accounts = $this->loadAndLockAccounts($normalized['accounts'], $allocation, $warehouseId);
+			$accounts = $this->loadAndLockAccounts($normalized['accounts'], $allocation, $warehouseId, $normalized);
 			$this->assertChangeAvailability($accounts, $normalized);
 
 			$paymentMode = $this->loadCashPaymentMode($normalized['payment_method_id']);
@@ -124,6 +121,7 @@ class InvoicePlusCashSettlementService
 					$invoice,
 					'CDF',
 					$allocation['payment_cdf_cents'],
+					$normalized['received_cdf_cents'],
 					$accounts['cdf']['id'],
 					$paymentMode,
 					$normalized
@@ -134,16 +132,20 @@ class InvoicePlusCashSettlementService
 					$invoice,
 					'USD',
 					$allocation['payment_usd_cents'],
+					$normalized['received_usd_cents'],
 					$accounts['usd']['id'],
 					$paymentMode,
 					$normalized
 				);
 			}
 
-			$transfer = null;
-			if ($allocation['transfer'] !== null) {
-				$transfer = $this->createCurrencyTransfer($invoice, $accounts, $allocation['transfer'], $normalized);
-			}
+			$cashMovements = $this->createPhysicalCashMovements(
+				$invoice,
+				$accounts,
+				$normalized,
+				$payments
+			);
+			$this->assertPhysicalCashMovementCoverage($normalized, $cashMovements);
 
 			$invoiceAfterPayment = new Facture($this->db);
 			if ($invoiceAfterPayment->fetch($invoiceId) <= 0) {
@@ -168,7 +170,7 @@ class InvoicePlusCashSettlementService
 				$allocation,
 				$accounts,
 				$payments,
-				$transfer,
+				$cashMovements,
 				$paymentMode
 			);
 			$this->completeOperation($normalized['operation_id'], $payloadHash, $response);
@@ -337,8 +339,8 @@ class InvoicePlusCashSettlementService
 	}
 
 	/**
-	 * Allocate invoice payments as close as possible to the physical net tender.
-	 * Any cross-currency difference is returned as one linked bank transfer.
+	 * Allocate invoice links as close as possible to the physical net tender.
+	 * Physical receipt/change rows are created separately from this allocation.
 	 *
 	 * @param int   $remainingCdf Invoice remainder, CDF cents
 	 * @param int   $remainingUsd Invoice remainder, USD cents
@@ -375,6 +377,9 @@ class InvoicePlusCashSettlementService
 			if ($paymentCdf < 0) {
 				continue;
 			}
+			if (($paymentCdf > 0 && $netCdf <= 0) || ($paymentUsd > 0 && $netUsd <= 0)) {
+				continue;
+			}
 			$convertedBase = (int) round($paymentCdf / $rate) + $paymentUsd;
 			if ($convertedBase !== $remainingUsd) {
 				continue;
@@ -382,24 +387,10 @@ class InvoicePlusCashSettlementService
 
 			$transferCdfDelta = (int) $netCdf - $paymentCdf;
 			$transferUsdDelta = (int) $netUsd - $paymentUsd;
-			$transfer = null;
-			if ($transferCdfDelta === 0 && $transferUsdDelta === 0) {
-				$transfer = null;
-			} elseif ($transferCdfDelta < 0 && $transferUsdDelta > 0) {
-				$transfer = array(
-					'from' => 'CDF',
-					'to' => 'USD',
-					'from_cents' => -$transferCdfDelta,
-					'to_cents' => $transferUsdDelta,
-				);
-			} elseif ($transferCdfDelta > 0 && $transferUsdDelta < 0) {
-				$transfer = array(
-					'from' => 'USD',
-					'to' => 'CDF',
-					'from_cents' => -$transferUsdDelta,
-					'to_cents' => $transferCdfDelta,
-				);
-			} else {
+			$compatible = ($transferCdfDelta === 0 && $transferUsdDelta === 0)
+				|| ($transferCdfDelta < 0 && $transferUsdDelta > 0)
+				|| ($transferCdfDelta > 0 && $transferUsdDelta < 0);
+			if (!$compatible) {
 				continue;
 			}
 
@@ -408,7 +399,6 @@ class InvoicePlusCashSettlementService
 				$best = array(
 					'payment_cdf_cents' => $paymentCdf,
 					'payment_usd_cents' => $paymentUsd,
-					'transfer' => $transfer,
 				);
 				$bestScore = $score;
 			}
@@ -813,14 +803,14 @@ class InvoicePlusCashSettlementService
 	}
 
 	/** Load, authorize and lock the exact accounts needed by the allocation. */
-	private function loadAndLockAccounts(array $requested, array $allocation, $warehouseId)
+	private function loadAndLockAccounts(array $requested, array $allocation, $warehouseId, array $normalized)
 	{
-		$requiresCdf = $allocation['payment_cdf_cents'] > 0;
-		$requiresUsd = $allocation['payment_usd_cents'] > 0;
-		if ($allocation['transfer'] !== null) {
-			$requiresCdf = true;
-			$requiresUsd = true;
-		}
+		$requiresCdf = $allocation['payment_cdf_cents'] > 0
+			|| $normalized['received_cdf_cents'] > 0
+			|| $normalized['change_cdf_cents'] > 0;
+		$requiresUsd = $allocation['payment_usd_cents'] > 0
+			|| $normalized['received_usd_cents'] > 0
+			|| $normalized['change_usd_cents'] > 0;
 
 		$accounts = array('cdf' => null, 'usd' => null);
 		foreach (array('cdf' => 'CDF', 'usd' => 'USD') as $key => $currency) {
@@ -897,9 +887,275 @@ class InvoicePlusCashSettlementService
 			if ($accounts[$key] === null) {
 				throw new RestException(422, $currency.' account is required to give change.');
 			}
-			$available = $accounts[$key]['balance_cents'] + $normalized['received_'.$key.'_cents'];
+			$available = $this->getAvailableChangeCents(
+				$accounts[$key]['balance_cents'],
+				$normalized['received_'.$key.'_cents']
+			);
 			if ($available < $change) {
 				throw new RestException(409, 'Insufficient '.$currency.' cash available to give the requested change.');
+			}
+		}
+	}
+
+	/** Cash received now remains available even if historical ledger balance is negative. */
+	private function getAvailableChangeCents($balanceCents, $receivedCents)
+	{
+		return max(0, (int) $balanceCents) + max(0, (int) $receivedCents);
+	}
+
+	/** Create exactly one gross receipt and one gross returned-change row per used currency. */
+	private function createPhysicalCashMovements($invoice, array $accounts, array $normalized, array &$payments)
+	{
+		$movements = array('cdf' => null, 'usd' => null);
+		foreach (array('cdf' => 'CDF', 'usd' => 'USD') as $key => $currency) {
+			$receivedCents = (int) $normalized['received_'.$key.'_cents'];
+			$changeCents = (int) $normalized['change_'.$key.'_cents'];
+			if ($receivedCents <= 0 && $changeCents <= 0) {
+				continue;
+			}
+			if ($accounts[$key] === null) {
+				throw new RestException(422, $currency.' account is required to record physical cash movements.');
+			}
+
+			$account = new Account($this->db);
+			if ($account->fetch((int) $accounts[$key]['id']) <= 0) {
+				throw new RestException(500, 'Unable to reload '.$currency.' cash account for physical movements.');
+			}
+
+			$receivedLineId = null;
+			if ($receivedCents > 0) {
+				if ($payments[$key] !== null && !empty($payments[$key]['bank_line_id'])) {
+					$receivedLineId = (int) $payments[$key]['bank_line_id'];
+					$this->updatePaymentBankLineToGrossReceipt($receivedLineId, (int) $accounts[$key]['id'], $currency, $receivedCents, $invoice, $normalized);
+					$payments[$key]['ledger']['account_amount'] = $this->centsToDecimal($receivedCents);
+				} else {
+					$receivedLineId = $this->createStandaloneCashLine($account, $invoice, $currency, $receivedCents, 'received', $normalized);
+				}
+			}
+
+			$changeLineId = null;
+			if ($changeCents > 0) {
+				$changeLineId = $this->createStandaloneCashLine($account, $invoice, $currency, $changeCents, 'change', $normalized);
+			}
+
+			if ($receivedLineId !== null && $changeLineId !== null) {
+				$url = DOL_URL_ROOT.'/compta/bank/line.php?rowid=';
+				if ($account->add_url_line($receivedLineId, $changeLineId, $url, '(InvoicePlusSettlement)', 'invoiceplus_settlement') <= 0
+					|| $account->add_url_line($changeLineId, $receivedLineId, $url, '(InvoicePlusSettlement)', 'invoiceplus_settlement') <= 0) {
+					throw new RestException(500, 'Unable to link '.$currency.' receipt and returned change.');
+				}
+			}
+
+			$ledger = $this->loadAndValidatePhysicalCashMovementProof(
+				(int) $accounts[$key]['id'],
+				$currency,
+				$receivedCents,
+				$changeCents,
+				$receivedLineId,
+				$changeLineId,
+				$normalized['exchange_rate'],
+				$invoice
+			);
+			$movements[$key] = array(
+				'currency' => $currency,
+				'account_id' => (int) $accounts[$key]['id'],
+				'received_amount' => $this->centsToDecimal($receivedCents),
+				'change_amount' => $this->centsToDecimal($changeCents),
+				'received_bank_line_id' => $receivedLineId,
+				'change_bank_line_id' => $changeLineId,
+				'ledger' => array(
+					'received_account_amount' => $this->centsToDecimal($ledger['received_amount_cents']),
+					'change_account_amount' => $this->centsToDecimal($ledger['change_amount_cents']),
+				),
+			);
+		}
+		return $movements;
+	}
+
+	/** Create one standalone gross receipt or returned-change row. */
+	private function createStandaloneCashLine($account, $invoice, $currency, $amountCents, $kind, array $normalized)
+	{
+		$signedCents = $kind === 'change' ? (0 - (int) $amountCents) : (int) $amountCents;
+		$mainCents = $currency === 'CDF' ? (int) round($signedCents / $normalized['exchange_rate']) : null;
+		$lineId = $account->addline(
+			$normalized['date'],
+			'LIQ',
+			$this->buildCashMovementDescription($kind, $invoice, $currency, $amountCents),
+			(float) $this->centsToDecimal($signedCents),
+			substr('IP-'.$normalized['operation_id'].'-'.($kind === 'change' ? 'OUT' : 'IN').'-'.$currency, 0, 50),
+			'',
+			$this->user,
+			'',
+			'',
+			'',
+			null,
+			'',
+			$mainCents === null ? null : (float) $this->centsToDecimal($mainCents)
+		);
+		if ($lineId <= 0) {
+			throw new RestException(500, 'Unable to record '.$currency.' '.($kind === 'change' ? 'returned change' : 'cash receipt').'.');
+		}
+		$this->linkCashLineToInvoiceAndCustomer($account, $lineId, $invoice);
+		return (int) $lineId;
+	}
+
+	/** Replace a native net payment line with the physical gross amount received. */
+	private function updatePaymentBankLineToGrossReceipt($lineId, $accountId, $currency, $receivedCents, $invoice, array $normalized)
+	{
+		$mainCents = $currency === 'CDF' ? (int) round($receivedCents / $normalized['exchange_rate']) : null;
+		$sql = 'UPDATE '.MAIN_DB_PREFIX.'bank SET';
+		$sql .= " amount = '".$this->db->escape($this->centsToDecimal($receivedCents))."'";
+		$sql .= ', amount_main_currency = '.($mainCents === null ? 'NULL' : "'".$this->db->escape($this->centsToDecimal($mainCents))."'");
+		$sql .= ", label = '".$this->db->escape($this->buildCashMovementDescription('received', $invoice, $currency, $receivedCents))."'";
+		$sql .= ' WHERE rowid = '.((int) $lineId).' AND fk_account = '.((int) $accountId);
+		if (!$this->db->query($sql)) {
+			throw new RestException(500, 'Unable to gross up '.$currency.' payment bank line.');
+		}
+		$this->linkCashLineToInvoice($accountId, $lineId, $invoice);
+	}
+
+	/** Link a raw cash line to both its invoice and customer. */
+	private function linkCashLineToInvoiceAndCustomer($account, $lineId, $invoice)
+	{
+		$this->ensureInvoiceThirdPartyLoaded($invoice);
+		if ($account->add_url_line($lineId, (int) $invoice->socid, DOL_URL_ROOT.'/comm/card.php?socid=', (string) $invoice->thirdparty->name, 'company') <= 0) {
+			throw new RestException(500, 'Unable to link cash movement to its customer.');
+		}
+		$this->linkCashLineToInvoice((int) $account->id, $lineId, $invoice);
+	}
+
+	/** Add an explicit invoice link without duplicating the native customer link. */
+	private function linkCashLineToInvoice($accountId, $lineId, $invoice)
+	{
+		$account = new Account($this->db);
+		if ($account->fetch((int) $accountId) <= 0
+			|| $account->add_url_line($lineId, (int) $invoice->id, DOL_URL_ROOT.'/compta/facture/card.php?facid=', 'Facture '.$invoice->ref, 'invoice') <= 0) {
+			throw new RestException(500, 'Unable to link cash movement to invoice '.$invoice->ref.'.');
+		}
+	}
+
+	/** Build a concise user-facing movement label with amount, invoice and customer. */
+	private function buildCashMovementDescription($kind, $invoice, $currency, $amountCents)
+	{
+		$this->ensureInvoiceThirdPartyLoaded($invoice);
+		$action = $kind === 'change' ? 'Monnaie rendue' : 'Paiement reçu';
+		$description = $action.' '.$this->formatReadableAmount($amountCents).' '.$currency
+			.' - Facture '.$invoice->ref.' - Client '.$invoice->thirdparty->name;
+		return dol_trunc($description, 255, 'right', 'UTF-8', 1);
+	}
+
+	/** Ensure descriptions and raw lines can use the authoritative invoice customer. */
+	private function ensureInvoiceThirdPartyLoaded($invoice)
+	{
+		if (empty($invoice->thirdparty) || empty($invoice->thirdparty->id)) {
+			if ($invoice->fetch_thirdparty() <= 0 || empty($invoice->thirdparty->id)) {
+				throw new RestException(500, 'Unable to load invoice customer for cash movement.');
+			}
+		}
+	}
+
+	/** Format integer cents for a readable French bank-entry description. */
+	private function formatReadableAmount($cents)
+	{
+		$absolute = abs((int) $cents);
+		return number_format(intdiv($absolute, 100), 0, ',', ' ').','.str_pad((string) ($absolute % 100), 2, '0', STR_PAD_LEFT);
+	}
+
+	/** Lock and prove the final gross receipt/change rows exactly as users will see them. */
+	private function loadAndValidatePhysicalCashMovementProof($accountId, $currency, $receivedCents, $changeCents, $receivedLineId, $changeLineId, $exchangeRate, $invoice)
+	{
+		$lineIds = array();
+		if ($receivedCents > 0 && (int) $receivedLineId > 0) {
+			$lineIds[] = (int) $receivedLineId;
+		}
+		if ($changeCents > 0 && (int) $changeLineId > 0) {
+			$lineIds[] = (int) $changeLineId;
+		}
+		if (count($lineIds) !== (($receivedCents > 0 ? 1 : 0) + ($changeCents > 0 ? 1 : 0))) {
+			throw new RestException(500, 'Physical cash movement identifiers are incomplete.');
+		}
+
+		$sql = 'SELECT b.rowid, b.label, b.amount, b.amount_main_currency, b.fk_account, ba.currency_code';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'bank AS b';
+		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'bank_account AS ba ON ba.rowid = b.fk_account';
+		$sql .= ' WHERE b.rowid IN ('.implode(',', $lineIds).')';
+		$sql .= ' AND b.fk_account = '.((int) $accountId);
+		$sql .= ' AND ba.entity IN ('.getEntity('bank_account').') FOR UPDATE';
+		$result = $this->db->query($sql);
+		if (!$result || $this->db->num_rows($result) !== count($lineIds)) {
+			if ($result) {
+				$this->db->free($result);
+			}
+			throw new RestException(500, 'Physical cash movements have no unique native ledger proof.');
+		}
+
+		$rows = array();
+		while ($row = $this->db->fetch_object($result)) {
+			$rows[(int) $row->rowid] = $row;
+		}
+		$this->db->free($result);
+		$receivedRow = $receivedCents > 0 && isset($rows[$receivedLineId]) ? $rows[$receivedLineId] : null;
+		$changeRow = $changeCents > 0 && isset($rows[$changeLineId]) ? $rows[$changeLineId] : null;
+		$proof = array(
+			'account_id' => (int) $accountId,
+			'account_currency' => strtoupper((string) ($receivedRow ? $receivedRow->currency_code : $changeRow->currency_code)),
+			'received_bank_line_id' => $receivedRow ? (int) $receivedRow->rowid : null,
+			'change_bank_line_id' => $changeRow ? (int) $changeRow->rowid : null,
+			'received_amount_cents' => $receivedRow ? $this->storedMoneyToCents($receivedRow->amount, 'cash receipt bank.amount') : 0,
+			'change_amount_cents' => $changeRow ? $this->storedMoneyToCents($changeRow->amount, 'returned change bank.amount') : 0,
+			'received_main_cents' => $receivedRow ? $this->storedMoneyToCents($receivedRow->amount_main_currency, 'cash receipt bank.amount_main_currency', true) : null,
+			'change_main_cents' => $changeRow ? $this->storedMoneyToCents($changeRow->amount_main_currency, 'returned change bank.amount_main_currency', true) : null,
+			'received_label' => $receivedRow ? (string) $receivedRow->label : null,
+			'change_label' => $changeRow ? (string) $changeRow->label : null,
+		);
+		$this->assertPhysicalCashMovementProof($proof, $accountId, $currency, $receivedCents, $changeCents, $receivedLineId, $changeLineId, $exchangeRate, $invoice);
+		return $proof;
+	}
+
+	/** Validate exact amounts, signs, currencies and user-facing descriptions. */
+	private function assertPhysicalCashMovementProof(array $proof, $accountId, $currency, $receivedCents, $changeCents, $receivedLineId, $changeLineId, $exchangeRate, $invoice)
+	{
+		$valid = (int) $proof['account_id'] === (int) $accountId
+			&& (string) $proof['account_currency'] === (string) $currency
+			&& $proof['received_bank_line_id'] === ($receivedCents > 0 ? (int) $receivedLineId : null)
+			&& $proof['change_bank_line_id'] === ($changeCents > 0 ? (int) $changeLineId : null)
+			&& (int) $proof['received_amount_cents'] === (int) $receivedCents
+			&& (int) $proof['change_amount_cents'] === (0 - (int) $changeCents)
+			&& $proof['received_label'] === ($receivedCents > 0 ? $this->buildCashMovementDescription('received', $invoice, $currency, $receivedCents) : null)
+			&& $proof['change_label'] === ($changeCents > 0 ? $this->buildCashMovementDescription('change', $invoice, $currency, $changeCents) : null);
+		if ($currency === 'CDF') {
+			$expectedReceivedMain = $receivedCents > 0 ? (int) round($receivedCents / $exchangeRate) : null;
+			$expectedChangeMain = $changeCents > 0 ? (0 - (int) round($changeCents / $exchangeRate)) : null;
+			$valid = $valid
+				&& $proof['received_main_cents'] === $expectedReceivedMain
+				&& $proof['change_main_cents'] === $expectedChangeMain;
+		} else {
+			$valid = $valid && $proof['received_main_cents'] === null && $proof['change_main_cents'] === null;
+		}
+		if (!$valid) {
+			throw new RestException(500, 'Physical cash movements failed exact native-ledger reconciliation.');
+		}
+	}
+
+	/** Prove that response movement ids and amounts exactly match the request. */
+	private function assertPhysicalCashMovementCoverage(array $normalized, array $cashMovements)
+	{
+		foreach (array('cdf' => 'CDF', 'usd' => 'USD') as $key => $currency) {
+			$received = (int) $normalized['received_'.$key.'_cents'];
+			$change = (int) $normalized['change_'.$key.'_cents'];
+			$movement = $cashMovements[$key];
+			if ($received <= 0 && $change <= 0) {
+				if ($movement !== null) {
+					throw new RestException(500, $currency.' has unexpected physical cash movements.');
+				}
+				continue;
+			}
+			if ($movement === null
+				|| $this->moneyToCents($movement['received_amount'], 'received cash movement amount') !== $received
+				|| $this->moneyToCents($movement['change_amount'], 'change cash movement amount') !== $change
+				|| ($received > 0) !== ((int) $movement['received_bank_line_id'] > 0)
+				|| ($change > 0) !== ((int) $movement['change_bank_line_id'] > 0)) {
+				throw new RestException(500, $currency.' physical cash movements do not match received and returned amounts.');
 			}
 		}
 	}
@@ -923,9 +1179,12 @@ class InvoicePlusCashSettlementService
 	}
 
 	/** Create a native customer payment and its native bank line. */
-	private function createPayment($invoice, $currency, $amountCents, $accountId, array $paymentMode, array $normalized)
+	private function createPayment($invoice, $currency, $amountCents, $receivedCents, $accountId, array $paymentMode, array $normalized)
 	{
 		global $conf;
+		if ($receivedCents <= 0) {
+			throw new RestException(422, $currency.' invoice allocation requires a positive physical receipt.');
+		}
 
 		$payment = new Paiement($this->db);
 		$payment->datepaye = $normalized['date'];
@@ -982,6 +1241,7 @@ class InvoicePlusCashSettlementService
 			'ref_ext' => $externalRef,
 			'ledger' => array(
 				'account_amount' => $this->centsToDecimal($ledgerProof['bank_amount_cents']),
+				'received_amount' => $this->centsToDecimal($receivedCents),
 				'account_currency' => $currency,
 				'company_amount' => $this->centsToDecimal($ledgerProof['payment_base_cents']),
 				'company_currency' => strtoupper((string) $conf->currency),
@@ -1083,89 +1343,8 @@ class InvoicePlusCashSettlementService
 		}
 	}
 
-	/** Create the two linked bank lines required by a cross-currency exchange. */
-	private function createCurrencyTransfer($invoice, array $accounts, array $transfer, array $normalized)
-	{
-		$fromKey = strtolower($transfer['from']);
-		$toKey = strtolower($transfer['to']);
-		$fromAccount = new Account($this->db);
-		$toAccount = new Account($this->db);
-		if ($fromAccount->fetch($accounts[$fromKey]['id']) <= 0 || $toAccount->fetch($accounts[$toKey]['id']) <= 0) {
-			throw new RestException(500, 'Unable to reload cash accounts for currency transfer.');
-		}
-
-		$description = 'InvoicePlus '.$normalized['operation_id'].' - invoice '.$invoice->ref;
-		$num = substr('IP-'.$normalized['operation_id'], 0, 50);
-		$fromAmount = (float) $this->centsToDecimal($transfer['from_cents']);
-		$toAmount = (float) $this->centsToDecimal($transfer['to_cents']);
-		$fromMainAmount = null;
-		$toMainAmount = null;
-		if ($transfer['from'] === 'CDF') {
-			$fromMainAmount = -$toAmount;
-		}
-		if ($transfer['to'] === 'CDF') {
-			$toMainAmount = $fromAmount;
-		}
-
-		$fromLineId = $fromAccount->addline(
-			$normalized['date'],
-			'LIQ',
-			$description,
-			-$fromAmount,
-			$num,
-			'',
-			$this->user,
-			'',
-			'',
-			'',
-			null,
-			'',
-			$fromMainAmount
-		);
-		if ($fromLineId <= 0) {
-			throw new RestException(500, 'Unable to create source line for currency transfer.');
-		}
-		$toLineId = $toAccount->addline(
-			$normalized['date'],
-			'LIQ',
-			$description,
-			$toAmount,
-			$num,
-			'',
-			$this->user,
-			'',
-			'',
-			'',
-			null,
-			'',
-			$toMainAmount
-		);
-		if ($toLineId <= 0) {
-			throw new RestException(500, 'Unable to create destination line for currency transfer.');
-		}
-
-		$url = DOL_URL_ROOT.'/compta/bank/line.php?rowid=';
-		if ($fromAccount->add_url_line($fromLineId, $toLineId, $url, '(banktransfert)', 'banktransfert') <= 0) {
-			throw new RestException(500, 'Unable to link source currency-transfer line.');
-		}
-		if ($toAccount->add_url_line($toLineId, $fromLineId, $url, '(banktransfert)', 'banktransfert') <= 0) {
-			throw new RestException(500, 'Unable to link destination currency-transfer line.');
-		}
-
-		return array(
-			'from_currency' => $transfer['from'],
-			'to_currency' => $transfer['to'],
-			'from_amount' => $this->centsToDecimal($transfer['from_cents']),
-			'to_amount' => $this->centsToDecimal($transfer['to_cents']),
-			'from_account_id' => (int) $accounts[$fromKey]['id'],
-			'to_account_id' => (int) $accounts[$toKey]['id'],
-			'from_bank_line_id' => (int) $fromLineId,
-			'to_bank_line_id' => (int) $toLineId,
-		);
-	}
-
 	/** Build the stable response stored for future idempotent replays. */
-	private function buildResult($invoice, array $normalized, array $remaining, array $allocation, array $accounts, array $payments, $transfer, array $paymentMode)
+	private function buildResult($invoice, array $normalized, array $remaining, array $allocation, array $accounts, array $payments, array $cashMovements, array $paymentMode)
 	{
 		return array(
 			'success' => true,
@@ -1200,7 +1379,8 @@ class InvoicePlusCashSettlementService
 				'usd' => $accounts['usd'] !== null ? (int) $accounts['usd']['id'] : null,
 			),
 			'payments' => $payments,
-			'transfer' => $transfer,
+			'cash_movements' => $cashMovements,
+			'transfer' => null,
 		);
 	}
 

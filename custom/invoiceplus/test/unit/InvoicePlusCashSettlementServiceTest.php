@@ -73,51 +73,52 @@ class InvoicePlusCashSettlementServiceTest extends TestCase
 	}
 
 	/** @return void */
-	public function testMixedTenderNeedsNoTransferWhenBothNetsMatchPayments()
+	public function testMixedTenderAllocatesBothInvoiceCurrencies()
 	{
 		$result = $this->service->allocatePayments(28500000, 10000, 2850.0, 14250000, 5000);
 
 		$this->assertSame(14250000, $result['payment_cdf_cents']);
 		$this->assertSame(5000, $result['payment_usd_cents']);
-		$this->assertNull($result['transfer']);
+		$this->assertArrayNotHasKey('transfer', $result);
 	}
 
 	/** @return void */
-	public function testExactInvoice248MixedAllocationNeedsNoTransfer()
+	public function testExactInvoice248AllocatesBothInvoiceCurrencies()
 	{
 		$result = $this->service->allocatePayments(42750000, 15000, 2850.0, 14250000, 10000);
 
 		$this->assertSame(14250000, $result['payment_cdf_cents']);
 		$this->assertSame(10000, $result['payment_usd_cents']);
-		$this->assertNull($result['transfer']);
+		$this->assertArrayNotHasKey('transfer', $result);
 	}
 
 	/** @return void */
-	public function testUsdOverTenderAndCdfChangeCreateCdfToUsdTransfer()
+	public function testUsdReceiptAndCdfChangeAllocateInvoiceOnlyToUsd()
 	{
 		// $200 received, CDF 285,000 returned, invoice total USD 100.
 		$result = $this->service->allocatePayments(28500000, 10000, 2850.0, -28500000, 20000);
 
 		$this->assertSame(0, $result['payment_cdf_cents']);
 		$this->assertSame(10000, $result['payment_usd_cents']);
-		$this->assertSame('CDF', $result['transfer']['from']);
-		$this->assertSame('USD', $result['transfer']['to']);
-		$this->assertSame(28500000, $result['transfer']['from_cents']);
-		$this->assertSame(10000, $result['transfer']['to_cents']);
+		$this->assertArrayNotHasKey('transfer', $result);
 	}
 
 	/** @return void */
-	public function testCdfOverTenderAndUsdChangeCreateUsdToCdfTransfer()
+	public function testCdfReceiptAndUsdChangeAllocateInvoiceOnlyToCdf()
 	{
 		// CDF 570,000 received, USD 100 returned, invoice total CDF 285,000.
 		$result = $this->service->allocatePayments(28500000, 10000, 2850.0, 57000000, -10000);
 
 		$this->assertSame(28500000, $result['payment_cdf_cents']);
 		$this->assertSame(0, $result['payment_usd_cents']);
-		$this->assertSame('USD', $result['transfer']['from']);
-		$this->assertSame('CDF', $result['transfer']['to']);
-		$this->assertSame(10000, $result['transfer']['from_cents']);
-		$this->assertSame(28500000, $result['transfer']['to_cents']);
+		$this->assertArrayNotHasKey('transfer', $result);
+	}
+
+	/** @return void */
+	public function testCurrentTenderIsAvailableDespiteNegativeHistoricalBalance()
+	{
+		$this->assertSame(20000000, $this->invokeAvailableChange(-23056900, 20000000));
+		$this->assertSame(25000000, $this->invokeAvailableChange(5000000, 20000000));
 	}
 
 	/** @return void */
@@ -226,6 +227,104 @@ class InvoicePlusCashSettlementServiceTest extends TestCase
 		$this->invokePaymentLedgerProof($proof, 'USD', 10000);
 	}
 
+	/** @return void */
+	public function testUsdPhysicalProofRecordsGrossReceiptAndGrossChange()
+	{
+		$invoice = $this->fakeInvoice();
+		$proof = array(
+			'account_id' => 8,
+			'account_currency' => 'USD',
+			'received_bank_line_id' => 80,
+			'change_bank_line_id' => 81,
+			'received_amount_cents' => 15000,
+			'change_amount_cents' => -3000,
+			'received_main_cents' => null,
+			'change_main_cents' => null,
+			'received_label' => 'Paiement reçu 150,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+			'change_label' => 'Monnaie rendue 30,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+		);
+
+		$this->invokePhysicalCashMovementProof($proof, 'USD', 15000, 3000, $invoice);
+		$this->addToAssertionCount(1);
+	}
+
+	/** @return void */
+	public function testCdfPhysicalProofRecordsGrossReceiptAndGrossChange()
+	{
+		$invoice = $this->fakeInvoice();
+		$proof = array(
+			'account_id' => 9,
+			'account_currency' => 'CDF',
+			'received_bank_line_id' => 80,
+			'change_bank_line_id' => 81,
+			'received_amount_cents' => 34250000,
+			'change_amount_cents' => -50000,
+			'received_main_cents' => 12018,
+			'change_main_cents' => -18,
+			'received_label' => 'Paiement reçu 342 500,00 CDF - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+			'change_label' => 'Monnaie rendue 500,00 CDF - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+		);
+
+		$this->invokePhysicalCashMovementProof($proof, 'CDF', 34250000, 50000, $invoice);
+		$this->addToAssertionCount(1);
+	}
+
+	/** @return void */
+	public function testPhysicalProofRejectsNetReceiptInsteadOfGrossReceipt()
+	{
+		$proof = array(
+			'account_id' => 8,
+			'account_currency' => 'USD',
+			'received_bank_line_id' => 80,
+			'change_bank_line_id' => 81,
+			'received_amount_cents' => 12000,
+			'change_amount_cents' => -3000,
+			'received_main_cents' => null,
+			'change_main_cents' => null,
+			'received_label' => 'Paiement reçu 150,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+			'change_label' => 'Monnaie rendue 30,00 USD - Facture IN2608-0187 - Client CLIENT PDV KOLWEZI',
+		);
+
+		$this->expectException(RestException::class);
+		$this->invokePhysicalCashMovementProof($proof, 'USD', 15000, 3000, $this->fakeInvoice());
+	}
+
+	/** @return void */
+	public function testPhysicalCoverageMatchesRequestExactly()
+	{
+		$normalized = array(
+			'received_cdf_cents' => 20000000,
+			'change_cdf_cents' => 50000,
+			'received_usd_cents' => 15000,
+			'change_usd_cents' => 3000,
+		);
+		$cashMovements = array(
+			'cdf' => array(
+				'received_amount' => '200000.00',
+				'change_amount' => '500.00',
+				'received_bank_line_id' => 70,
+				'change_bank_line_id' => 71,
+			),
+			'usd' => array(
+				'received_amount' => '150.00',
+				'change_amount' => '30.00',
+				'received_bank_line_id' => 72,
+				'change_bank_line_id' => 73,
+			),
+		);
+
+		$this->invokePhysicalCashMovementCoverage($normalized, $cashMovements);
+		$this->addToAssertionCount(1);
+	}
+
+	/** Invoke the private available-change calculation without database access. */
+	private function invokeAvailableChange($balanceCents, $receivedCents)
+	{
+		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'getAvailableChangeCents');
+		$method->setAccessible(true);
+		return $method->invoke($this->service, $balanceCents, $receivedCents);
+	}
+
 	/** Invoke the private pure proof checker without touching the database. */
 	private function invokeWarehouseProof(array $requirements, array $movements, $warehouseId)
 	{
@@ -240,6 +339,33 @@ class InvoicePlusCashSettlementServiceTest extends TestCase
 		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'assertPaymentLedgerProof');
 		$method->setAccessible(true);
 		$method->invoke($this->service, $proof, 27, 76, $currency === 'CDF' ? 9 : 8, $currency, $amountCents, 2850.0);
+	}
+
+	/** Invoke the private exact physical-cash proof without database writes. */
+	private function invokePhysicalCashMovementProof(array $proof, $currency, $receivedCents, $changeCents, $invoice)
+	{
+		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'assertPhysicalCashMovementProof');
+		$method->setAccessible(true);
+		$method->invoke($this->service, $proof, $currency === 'CDF' ? 9 : 8, $currency, $receivedCents, $changeCents, 80, 81, 2850.0, $invoice);
+	}
+
+	/** Invoke the private response-to-request movement coverage proof. */
+	private function invokePhysicalCashMovementCoverage(array $normalized, array $cashMovements)
+	{
+		$method = new ReflectionMethod(InvoicePlusCashSettlementService::class, 'assertPhysicalCashMovementCoverage');
+		$method->setAccessible(true);
+		$method->invoke($this->service, $normalized, $cashMovements);
+	}
+
+	/** Minimal already-loaded invoice object for pure description/proof tests. */
+	private function fakeInvoice()
+	{
+		$invoice = new stdClass();
+		$invoice->id = 187;
+		$invoice->socid = 21;
+		$invoice->ref = 'IN2608-0187';
+		$invoice->thirdparty = (object) array('id' => 21, 'name' => 'CLIENT PDV KOLWEZI');
+		return $invoice;
 	}
 
 	/** Native values expected for one half-CDF / two-thirds-USD mixed tender. */

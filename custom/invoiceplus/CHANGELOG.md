@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.3.4 - 2026-08-18
+
+- Record exactly one positive cash-account movement for the full amount
+  physically received and one negative movement for the full amount returned,
+  independently for CDF and USD.
+- Keep native invoice allocations exact while grossing up their bank ledger
+  rows; remove visible compensating and cross-currency transfer movements.
+- Give every movement a concise French description containing its amount,
+  currency, invoice reference and customer, with native links to both records.
+- Re-read and reconcile the final bank rows before commit, rejecting net
+  receipts, wrong signs, missing ids or altered descriptions.
+
+## 1.3.3 - 2026-08-18
+
+- Record same-currency returned change as an explicit negative native cash-
+  account row instead of hiding it inside the net invoice payment.
+- Add the compensating gross-tender row so account balances remain unchanged,
+  link both rows, and reconcile their signs, currencies and base amounts before
+  committing the settlement.
+- Prove that cross-currency change deficits remain carried by the existing
+  negative transfer row and expose direct rows through `cash_movements`.
+- Treat cash received by the current sale as available for change even when a
+  historical account ledger balance is negative.
+
 ## 1.3.2 - 2026-08-15
 
 - Replace the separate physical-cash block with an upgrade-safe, idempotent
