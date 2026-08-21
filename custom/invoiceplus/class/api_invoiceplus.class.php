@@ -18,6 +18,8 @@ use Luracast\Restler\RestException;
 dol_include_once('/invoiceplus/class/invoiceplusinvoiceservice.class.php');
 dol_include_once('/invoiceplus/class/invoiceplusthirdpartyservice.class.php');
 dol_include_once('/invoiceplus/class/invoicepluscashsettlementservice.class.php');
+dol_include_once('/invoiceplus/class/invoicepluspricelevelservice.class.php');
+dol_include_once('/invoiceplus/class/invoiceplusproductlistservice.class.php');
 
 /**
  * InvoicePlus REST API.
@@ -36,6 +38,9 @@ class Invoiceplus extends DolibarrApi
 	/** @var InvoicePlusCashSettlementService */
 	private $cashSettlementService;
 
+	/** @var InvoicePlusProductListService */
+	private $productListService;
+
 	/**
 	 * Constructor.
 	 */
@@ -47,6 +52,137 @@ class Invoiceplus extends DolibarrApi
 		$this->invoiceService = null;
 		$this->thirdPartyService = null;
 		$this->cashSettlementService = null;
+		$this->productListService = null;
+	}
+
+	/**
+	 * List products with the price applicable to one customer.
+	 *
+	 * The explicit price level of the third party is used when it exists,
+	 * otherwise level 1. When the requested level holds no price, the fallback
+	 * goes directly to level 1; no intermediate level is ever tried. This route
+	 * takes no warehouse and never infers one.
+	 *
+	 * @param int    $customer_id      Third-party id
+	 * @param string $sortfield        Whitelisted product sort field
+	 * @param string $sortorder        ASC or DESC
+	 * @param int    $limit            Page size, capped by INVOICEPLUS_MAX_API_LIMIT
+	 * @param int    $page             Zero-based page
+	 * @param int    $mode             0 all, 1 products only, 2 services only
+	 * @param int    $category         Category id filter
+	 * @param string $sqlfilters       Native Universal Search criteria using t or ef aliases
+	 * @param int    $variant_filter   Native variant filter
+	 * @param mixed  $pagination_data  true, false, 1 or 0
+	 * @param mixed  $includestockdata true, false, 1 or 0
+	 * @param string $properties       Comma-separated response properties
+	 * @param string $on_missing_price error to refuse the page, skip to omit unpriced products
+	 * @return array                    Products or pagination envelope
+	 *
+	 * @url GET /products/customer/{customer_id}
+	 *
+	 * @throws RestException 400 Invalid parameter
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 404 Third party not found
+	 * @throws RestException 409 Price levels are disabled
+	 * @throws RestException 422 No applicable price, level 1 included
+	 * @throws RestException 503 Database read error
+	 */
+	public function getProductsByCustomer(
+		$customer_id,
+		$sortfield = 't.ref',
+		$sortorder = 'ASC',
+		$limit = 100,
+		$page = 0,
+		$mode = 0,
+		$category = 0,
+		$sqlfilters = '',
+		$variant_filter = 0,
+		$pagination_data = false,
+		$includestockdata = 0,
+		$properties = '',
+		$on_missing_price = 'error'
+	) {
+		$this->assertInvoicePlusApiEnabled();
+
+		return $this->getProductListService()->getProductsForCustomer($customer_id, array(
+			'sortfield' => (string) $sortfield,
+			'sortorder' => (string) $sortorder,
+			'limit' => $limit,
+			'page' => $page,
+			'mode' => $mode,
+			'category' => $category,
+			'sqlfilters' => (string) $sqlfilters,
+			'variant_filter' => $variant_filter,
+			'pagination_data' => $pagination_data,
+			'includestockdata' => $includestockdata,
+			'properties' => (string) $properties,
+			'on_missing_price' => (string) $on_missing_price,
+		));
+	}
+
+	/**
+	 * List products with the price applicable to one warehouse.
+	 *
+	 * The explicit price level of the warehouse is used when it exists,
+	 * otherwise level 1, with the same direct level-1 price fallback. This
+	 * route returns products; GET /invoiceplus/warehouse/{warehouse_id} keeps
+	 * returning invoices and is unchanged.
+	 *
+	 * @param int    $warehouse_id     Warehouse id
+	 * @param string $sortfield        Whitelisted product sort field
+	 * @param string $sortorder        ASC or DESC
+	 * @param int    $limit            Page size, capped by INVOICEPLUS_MAX_API_LIMIT
+	 * @param int    $page             Zero-based page
+	 * @param int    $mode             0 all, 1 products only, 2 services only
+	 * @param int    $category         Category id filter
+	 * @param string $sqlfilters       Native Universal Search criteria using t or ef aliases
+	 * @param int    $variant_filter   Native variant filter
+	 * @param mixed  $pagination_data  true, false, 1 or 0
+	 * @param mixed  $includestockdata true, false, 1 or 0
+	 * @param string $properties       Comma-separated response properties
+	 * @param string $on_missing_price error to refuse the page, skip to omit unpriced products
+	 * @return array                    Products or pagination envelope
+	 *
+	 * @url GET /products/warehouse/{warehouse_id}
+	 *
+	 * @throws RestException 400 Invalid parameter
+	 * @throws RestException 403 Access denied
+	 * @throws RestException 404 Warehouse not found
+	 * @throws RestException 409 Price levels are disabled
+	 * @throws RestException 422 No applicable price, level 1 included
+	 * @throws RestException 503 Database read error
+	 */
+	public function getProductsByWarehouse(
+		$warehouse_id,
+		$sortfield = 't.ref',
+		$sortorder = 'ASC',
+		$limit = 100,
+		$page = 0,
+		$mode = 0,
+		$category = 0,
+		$sqlfilters = '',
+		$variant_filter = 0,
+		$pagination_data = false,
+		$includestockdata = 0,
+		$properties = '',
+		$on_missing_price = 'error'
+	) {
+		$this->assertInvoicePlusApiEnabled();
+
+		return $this->getProductListService()->getProductsForWarehouse($warehouse_id, array(
+			'sortfield' => (string) $sortfield,
+			'sortorder' => (string) $sortorder,
+			'limit' => $limit,
+			'page' => $page,
+			'mode' => $mode,
+			'category' => $category,
+			'sqlfilters' => (string) $sqlfilters,
+			'variant_filter' => $variant_filter,
+			'pagination_data' => $pagination_data,
+			'includestockdata' => $includestockdata,
+			'properties' => (string) $properties,
+			'on_missing_price' => (string) $on_missing_price,
+		));
 	}
 
 	/**
@@ -501,6 +637,20 @@ class Invoiceplus extends DolibarrApi
 		}
 
 		return $this->cashSettlementService;
+	}
+
+	/**
+	 * Lazily create the authenticated product-list service.
+	 *
+	 * @return InvoicePlusProductListService
+	 */
+	private function getProductListService()
+	{
+		if ($this->productListService === null) {
+			$this->productListService = new InvoicePlusProductListService($this->db, DolibarrApiAccess::$user);
+		}
+
+		return $this->productListService;
 	}
 
 	/**

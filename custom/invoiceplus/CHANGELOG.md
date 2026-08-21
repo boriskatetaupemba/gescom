@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.0 - 2026-08-21
+
+- Add a central Customer > Warehouse > N1 price-level resolver built entirely
+  on the native `product_price` grid, with a direct level-1 fallback that never
+  tries an intermediate level and never turns a defined zero into an absence.
+- Read the raw `societe.price_level` column so "no customer level" stays
+  distinguishable from an explicit N1, and treat a legacy level above
+  `PRODUIT_MULTIPRICES_LIMIT` as undefined.
+- Add the N dynamic price rows missing from the native product creation form
+  through the `productcard` hook, reusing the native `price`, `price_base_type`,
+  `price_{N}` and `multiprices_base_type_{N}` field names.
+- Persist levels 2 to N with a dedicated `PRODUCT_CREATE` trigger calling the
+  native `Product::updatePrice()` inside the creation transaction; an empty
+  field writes nothing, an explicit zero writes zero, and a failing level rolls
+  the whole creation back.
+- Give warehouses a nullable commercial price level stored in the native
+  `entrepot_extrafields` table, rendered by the `warehousecard` hook from a
+  choice list rebuilt on every request.
+- Add `GET /invoiceplus/products/customer/{customer_id}` and
+  `GET /invoiceplus/products/warehouse/{warehouse_id}`, returning the native
+  product representation with the applicable price and the four resolution
+  properties, resolved by one grouped price query per page.
+- Keep `POST /invoiceplus/invoices/{id}/cash-settlement`, every existing route
+  and every stock valuation rule unchanged; document that InvoicePlus has no
+  invoice-creation POST and that the native one preserves an explicit
+  `lines[].subprice`, `0` included.
+
 ## 1.3.4 - 2026-08-18
 
 - Record exactly one positive cash-account movement for the full amount

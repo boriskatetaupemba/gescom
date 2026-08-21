@@ -1,14 +1,16 @@
 # InvoicePlus REST API compatibility test (PowerShell 5.1+)
 #
 # Usage:
-# .\test_invoiceplus_api.ps1 -BaseUrl "https://dolibarr.example" -ApiKey "KEY" -WarehouseId 5 [-InvoiceId 123] [-AccountIds "8,9"]
+# .\test_invoiceplus_api.ps1 -BaseUrl "https://dolibarr.example" -ApiKey "KEY" -WarehouseId 5 [-InvoiceId 123] [-AccountIds "8,9"] [-CustomerId 42] [-PriceLevelsEnabled $false]
 
 param(
 	[Parameter(Mandatory = $true)][string]$BaseUrl,
 	[Parameter(Mandatory = $true)][string]$ApiKey,
 	[Parameter(Mandatory = $true)][int]$WarehouseId,
 	[int]$InvoiceId = 0,
-	[string]$AccountIds = ''
+	[string]$AccountIds = '',
+	[int]$CustomerId = 0,
+	[bool]$PriceLevelsEnabled = $true
 )
 
 $BaseUrl = $BaseUrl.TrimEnd('/')
@@ -187,6 +189,110 @@ if ($InvoiceId -gt 0) {
 				Write-Host 'FAIL  native and InvoicePlus payloads differ' -ForegroundColor Red
 				$script:Failed++
 			}
+		}
+	}
+}
+
+
+# ---------------------------------------------------------------------------
+# Price-level product routes.
+# ---------------------------------------------------------------------------
+
+$ProductsWarehouseEndpoint = "$RootEndpoint/products/warehouse/$WarehouseId"
+
+function Assert-True {
+	param([string]$Label, [bool]$Condition)
+	if ($Condition) {
+		Write-Host "PASS  $Label" -ForegroundColor Green
+		$script:Passed++
+	} else {
+		Write-Host "FAIL  $Label" -ForegroundColor Red
+		$script:Failed++
+	}
+}
+
+if (-not $PriceLevelsEnabled) {
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?limit=1"
+	Assert-Status 'products by warehouse with multiprices disabled' 409 $result
+} else {
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?limit=5&on_missing_price=skip"
+	Assert-Status 'products by warehouse' 200 $result
+	if ($result.Code -eq 200) {
+		$products = @($result.Body | ConvertFrom-Json)
+		$allowedSources = @('customer', 'warehouse', 'default_level')
+		$contractOk = $true
+		foreach ($product in $products) {
+			$names = $product.PSObject.Properties.Name
+			foreach ($required in @('requested_price_level', 'applied_price_level', 'price_level_source', 'price_fallback', 'price', 'price_ttc', 'price_base_type', 'tva_tx')) {
+				if ($names -notcontains $required) { $contractOk = $false }
+			}
+			if ($allowedSources -notcontains $product.price_level_source) { $contractOk = $false }
+			if ($product.price_fallback -and ([int]$product.applied_price_level -ne 1)) { $contractOk = $false }
+		}
+		Assert-True 'warehouse price metadata and level-1 fallback contract' $contractOk
+	}
+
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?limit=2&pagination_data=true&on_missing_price=skip"
+	Assert-Status 'products by warehouse pagination envelope' 200 $result
+	if ($result.Code -eq 200) {
+		$envelope = $result.Body | ConvertFrom-Json
+		Assert-True 'pagination envelope shape' (($envelope.PSObject.Properties.Name -contains 'data') -and ([int]$envelope.pagination.limit -eq 2))
+	}
+
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?limit=2&on_missing_price=skip&properties=id,ref,price,applied_price_level"
+	Assert-Status 'properties filter applied after enrichment' 200 $result
+	if ($result.Code -eq 200) {
+		$filtered = @($result.Body | ConvertFrom-Json)
+		$onlyRequested = $true
+		foreach ($product in $filtered) {
+			$extra = @($product.PSObject.Properties.Name | Where-Object { @('id', 'ref', 'price', 'applied_price_level') -notcontains $_ })
+			if ($extra.Count -gt 0) { $onlyRequested = $false }
+		}
+		Assert-True 'only the requested properties are returned' $onlyRequested
+	}
+
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?sortfield=t.note_public"
+	Assert-Status 'non-whitelisted product sort field' 400 $result
+
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?sqlfilters=%28t.unknown%3A%3D%3A%27x%27%29"
+	Assert-Status 'non-whitelisted product sqlfilters field' 400 $result
+
+	$result = Invoke-TestRequest "${ProductsWarehouseEndpoint}?on_missing_price=ignore"
+	Assert-Status 'invalid on_missing_price' 400 $result
+
+	$result = Invoke-TestRequest "$RootEndpoint/products/warehouse/0"
+	Assert-Status 'zero warehouse id on the product route' 400 $result
+
+	$result = Invoke-TestRequest "$RootEndpoint/products/warehouse/999999999"
+	Assert-Status 'unknown warehouse on the product route' 404 $result
+
+	$result = Invoke-TestRequest "$RootEndpoint/products/customer/0"
+	Assert-Status 'zero customer id on the product route' 400 $result
+
+	$result = Invoke-TestRequest "$RootEndpoint/products/customer/999999999"
+	Assert-Status 'unknown customer on the product route' 404 $result
+
+	$result = Invoke-TestRequest "${Endpoint}?limit=1"
+	Assert-Status 'existing warehouse invoice route unchanged' 200 $result
+	if ($result.Code -eq 200) {
+		$invoices = @($result.Body | ConvertFrom-Json)
+		$stillInvoices = $true
+		foreach ($invoice in $invoices) {
+			if ($invoice.PSObject.Properties.Name -contains 'requested_price_level') { $stillInvoices = $false }
+		}
+		Assert-True 'GET /invoiceplus/warehouse/{id} still returns invoices' $stillInvoices
+	}
+
+	if ($CustomerId -gt 0) {
+		$result = Invoke-TestRequest "$RootEndpoint/products/customer/${CustomerId}?limit=5&on_missing_price=skip"
+		Assert-Status 'products by customer' 200 $result
+		if ($result.Code -eq 200) {
+			$customerProducts = @($result.Body | ConvertFrom-Json)
+			$noWarehouseSource = $true
+			foreach ($product in $customerProducts) {
+				if (@('customer', 'default_level') -notcontains $product.price_level_source) { $noWarehouseSource = $false }
+			}
+			Assert-True 'customer route never uses a warehouse level' $noWarehouseSource
 		}
 	}
 }

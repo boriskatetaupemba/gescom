@@ -110,4 +110,73 @@ if [ -n "${INVOICE_ID:-}" ]; then
 	echo 'PASS  native-compatible invoice payload'
 fi
 
+
+# ---------------------------------------------------------------------------
+# Price-level product routes.
+# Set CUSTOMER_ID to also run the customer route. PRICE_LEVELS_ENABLED=0 checks
+# the HTTP 409 returned when PRODUIT_MULTIPRICES is off.
+# ---------------------------------------------------------------------------
+
+PRODUCTS_WAREHOUSE_ENDPOINT="$ROOT_ENDPOINT/products/warehouse/$WAREHOUSE_ID"
+
+if [ "${PRICE_LEVELS_ENABLED:-1}" = "0" ]; then
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?limit=1" "$TMPDIR_INVOICEPLUS/levels-off.json")
+	assert_code 'products by warehouse with multiprices disabled' 409 "$code"
+else
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?limit=5&on_missing_price=skip" "$TMPDIR_INVOICEPLUS/products-warehouse.json")
+	assert_code 'products by warehouse' 200 "$code"
+	jq -e 'type == "array" and length <= 5' "$TMPDIR_INVOICEPLUS/products-warehouse.json" >/dev/null
+	jq -e 'all(.[];
+		has("requested_price_level") and has("applied_price_level")
+		and has("price_level_source") and has("price_fallback")
+		and has("price") and has("price_ttc") and has("price_base_type") and has("tva_tx")
+		and (.price_level_source | IN("customer", "warehouse", "default_level"))
+		and ((.price_fallback | not) or (.applied_price_level | tonumber) == 1)
+	)' "$TMPDIR_INVOICEPLUS/products-warehouse.json" >/dev/null
+	echo 'PASS  warehouse price metadata and level-1 fallback contract'
+
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?limit=2&pagination_data=true&on_missing_price=skip" "$TMPDIR_INVOICEPLUS/products-warehouse-page.json")
+	assert_code 'products by warehouse pagination envelope' 200 "$code"
+	jq -e '.data | type == "array"' "$TMPDIR_INVOICEPLUS/products-warehouse-page.json" >/dev/null
+	jq -e '.pagination.total >= 0 and .pagination.page == 0 and .pagination.limit == 2' "$TMPDIR_INVOICEPLUS/products-warehouse-page.json" >/dev/null
+
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?limit=2&on_missing_price=skip&properties=id,ref,price,applied_price_level" "$TMPDIR_INVOICEPLUS/products-warehouse-properties.json")
+	assert_code 'properties filter applied after enrichment' 200 "$code"
+	jq -e 'all(.[]; ((keys - ["id", "ref", "price", "applied_price_level"]) | length) == 0)' "$TMPDIR_INVOICEPLUS/products-warehouse-properties.json" >/dev/null
+
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?sortfield=t.note_public" "$TMPDIR_INVOICEPLUS/bad-product-sort.json")
+	assert_code 'non-whitelisted product sort field' 400 "$code"
+
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?sqlfilters=%28t.unknown%3A%3D%3A%27x%27%29" "$TMPDIR_INVOICEPLUS/bad-product-filter.json")
+	assert_code 'non-whitelisted product sqlfilters field' 400 "$code"
+
+	code=$(request "$PRODUCTS_WAREHOUSE_ENDPOINT?on_missing_price=ignore" "$TMPDIR_INVOICEPLUS/bad-missing-price.json")
+	assert_code 'invalid on_missing_price' 400 "$code"
+
+	code=$(request "$ROOT_ENDPOINT/products/warehouse/0" "$TMPDIR_INVOICEPLUS/bad-product-warehouse.json")
+	assert_code 'zero warehouse id on the product route' 400 "$code"
+
+	code=$(request "$ROOT_ENDPOINT/products/warehouse/999999999" "$TMPDIR_INVOICEPLUS/missing-product-warehouse.json")
+	assert_code 'unknown warehouse on the product route' 404 "$code"
+
+	code=$(request "$ROOT_ENDPOINT/products/customer/0" "$TMPDIR_INVOICEPLUS/bad-product-customer.json")
+	assert_code 'zero customer id on the product route' 400 "$code"
+
+	code=$(request "$ROOT_ENDPOINT/products/customer/999999999" "$TMPDIR_INVOICEPLUS/missing-product-customer.json")
+	assert_code 'unknown customer on the product route' 404 "$code"
+
+	# The invoice route must keep returning invoices, not products.
+	code=$(request "$ENDPOINT?limit=1" "$TMPDIR_INVOICEPLUS/still-invoices.json")
+	assert_code 'existing warehouse invoice route unchanged' 200 "$code"
+	jq -e 'all(.[]; has("requested_price_level") | not)' "$TMPDIR_INVOICEPLUS/still-invoices.json" >/dev/null
+	echo 'PASS  GET /invoiceplus/warehouse/{id} still returns invoices'
+
+	if [ -n "${CUSTOMER_ID:-}" ]; then
+		code=$(request "$ROOT_ENDPOINT/products/customer/$CUSTOMER_ID?limit=5&on_missing_price=skip" "$TMPDIR_INVOICEPLUS/products-customer.json")
+		assert_code 'products by customer' 200 "$code"
+		jq -e 'all(.[]; .price_level_source | IN("customer", "default_level"))' "$TMPDIR_INVOICEPLUS/products-customer.json" >/dev/null
+		echo 'PASS  customer route never uses a warehouse level'
+	fi
+fi
+
 echo 'All InvoicePlus API checks passed.'

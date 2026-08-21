@@ -2,7 +2,7 @@
 
 Run these checks on a disposable Dolibarr 20.0.4 test entity with API, Customer Invoices, Stock, and InvoicePlus enabled.
 
-1. Confirm `/api/index.php/explorer/` lists `invoiceplus`, the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, and `GET /thirdparties`.
+1. Confirm `/api/index.php/explorer/` lists `invoiceplus`, the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, `GET /thirdparties`, `GET /products/customer/{customer_id}`, and `GET /products/warehouse/{warehouse_id}`.
 2. Test a warehouse with no invoices: HTTP 200 and `[]`.
 3. Test valid, zero, negative, non-numeric, and unknown warehouse ids.
 4. Compare an invoice returned by InvoicePlus with `GET /invoices/{id}` using `loadlinkedobjects=true`; exclude the module-owned `invoiceclosure` and `invoiceplus_warehouse_filter` fields before comparing the native payload.
@@ -49,3 +49,41 @@ Run these checks on a disposable Dolibarr 20.0.4 test entity with API, Customer 
 45. Re-enable InvoicePlus so the `invoicecard` hook is registered, then open the native card for a mixed InvoicePlus invoice. Verify the existing Payments table has exactly one **Physical amount** column immediately before **Amount**, with 142,500 CDF beside the native 50 USD and 100 USD beside the native 100 USD. Verify there is no separate InvoicePlus table or explanatory notice.
 46. Add a non-InvoicePlus payment plus credit-note/deposit and remainder summary rows to the same disposable invoice. Verify its physical cell shows an em dash, every native Amount remains under the original Amount header, every summary label remains aligned, and repeated enrichment never adds a second header, cell or colspan increment. Repeat with the Bank module column enabled and disabled and at narrow viewport width.
 47. In a disposable database, alter an InvoicePlus payment `ref_ext`, settlement status, entity, invoice journal link or account currency one field at a time. Verify the row is never mapped to a physical amount, including a `:cdf` suffix on a USD account and `:usd` on CDF; restore the exact suffix/currency pair and completed same-entity/same-invoice journal and verify mapping returns.
+
+## Price levels (1.4.0)
+
+Run these on a disposable entity with `PRODUIT_MULTIPRICES` enabled and
+`PRODUIT_MULTIPRICES_LIMIT` set to a known value N, after re-enabling InvoicePlus.
+
+48. Confirm `/api/index.php/explorer/` lists `GET /products/customer/{customer_id}` and `GET /products/warehouse/{warehouse_id}`, and that `GET /warehouse/{warehouse_id}` still returns invoices.
+49. Open **Products > New product**. Confirm exactly N price rows appear, labelled with the native `SellingPrice` label plus any configured `PRODUIT_MULTIPRICES_LABEL{N}`, each with its HT/TTC selector. Change `PRODUIT_MULTIPRICES_LIMIT` and reload: the number of rows must follow immediately, with no reinstallation.
+50. Submit the creation form with every price empty. The product must be created by the native cycle, and `product_price` must contain only the native level-1 line.
+51. Create a product with level 1 and level 2 filled in. Confirm two history lines, one per level, with the submitted HT/TTC bases, and confirm the native `PRODUCT_PRICE_MODIFY` trigger fired for level 2.
+52. Create a product with level 2 exactly `0`. Confirm a level-2 line exists with price `0`. Create another with level 2 empty and confirm no level-2 line exists at all.
+53. Submit level 2 with level 1 empty. Creation must be refused before any record is written, with an explicit message, and the submitted values must still be in the redisplayed form.
+54. Submit a malformed amount such as `abc` on any level. Same expectation: refusal, no product, values preserved.
+55. In a disposable database, force a level to fail (for example a `PRODUCT_PRICE_MODIFY` trigger returning `-1`). Confirm the whole creation is rolled back: no `product` row, no `product_price` row.
+56. Create a product through `POST /api/index.php/products` with a price. Confirm no InvoicePlus processing occurs and no extra history line is created.
+57. Open the native **Prices** tab of a product created through the new form. Confirm edition, minimum prices, VAT, automatic rules and history all behave exactly as before, and that InvoicePlus adds no second edition interface.
+58. Open a warehouse card. Confirm a **Price level** row offering *None* and levels 1..N, in creation, edition and view mode, and that the native extrafield is not also rendered as a raw number.
+59. Save *None*, then reload: the stored column must be `NULL`, not `0`. Save level 1, then level N, and confirm each is stored and redisplayed.
+60. Post `options_invoiceplus_price_level` values `0`, `-1` and `N+1` directly. Each must be refused with an explicit message and no record written.
+61. Switch entity with `DOLAPIENTITY` / the multicompany selector. Confirm the level of a warehouse in another entity is never read.
+62. Disable `PRODUIT_MULTIPRICES`. Confirm the warehouse row disappears, the product creation grid disappears, saving a warehouse does not erase its stored level, and both product routes answer HTTP 409. Re-enable it and confirm the previous levels are still there.
+63. Disable and re-enable InvoicePlus. Confirm the `invoiceplus_price_level` definition and every stored value survive.
+64. In a disposable database, create an extrafield named `invoiceplus_price_level` on `entrepot` with a different type, then enable InvoicePlus. Activation must fail with an explicit message instead of reusing it.
+65. Customer on level 3, product with level 3 = 45: the customer route returns 45, `applied_price_level` 3, `price_fallback` false.
+66. Customer on level 3, product without level 3 but with level 1 = 50: the route returns 50, `applied_price_level` 1, `price_fallback` true.
+67. Customer with no level and product level 1 = 50: 50 with `price_level_source` `default_level`.
+68. Set a customer's `price_level` to a value above the current limit directly in the database: the route must return level 1 with `default_level` and log the ignored level.
+69. Repeat 65 to 68 on the warehouse route with the warehouse level.
+70. Customer on level 3, warehouse on level 2, product with level 1 = 50, level 2 = 45 and no level 3. The customer route must return **50**, never 45, with `requested_price_level` 3 and `applied_price_level` 1.
+71. Product with level 2 price exactly `0` and a customer on level 2: the route must return `0` with no fallback. Set the level-2 price column to `NULL` and confirm the fallback to level 1 resumes.
+72. Product with no price at the requested level and none at level 1: the default answer is HTTP 422 naming the product; `on_missing_price=skip` omits it and logs a warning.
+73. Verify `pagination_data`, `limit`, `page`, `sortfield`, `sortorder`, `mode`, `category`, `variant_filter`, `sqlfilters`, `includestockdata` and `properties`. Confirm `properties` can select and exclude the four new resolution properties.
+74. Verify HTTP 400 for a non-whitelisted `sortfield`, a non-whitelisted `sqlfilters` field, an unknown alias, an invalid `on_missing_price`, and a zero, negative or non-numeric id. Verify HTTP 404 for an unknown customer or warehouse.
+75. Verify HTTP 403 for a user without `produit.lire`, for a user without `societe.lire` on the customer route, for a user without `stock.lire` on the warehouse route, and for an external user requesting another third party.
+76. Enable the SQL log and call each route with `limit=50`. Confirm exactly one query touches `product_price` for the whole page.
+77. Confirm the native `GET /products` response and the native product list page are unchanged, and that stock movements, PMP/AWP and stock valuation are untouched by any warehouse level change.
+78. Post an invoice through native `POST /api/index.php/invoices` with `lines[].subprice` set to `0` and to a positive value. Confirm both are stored verbatim, and confirm that omitting `subprice` stores `0` rather than a resolved price.
+79. Re-run the existing checks 1 to 47, in particular `cash-settlement`, invoice validation and the invoice-card physical-amount column, and confirm nothing changed.

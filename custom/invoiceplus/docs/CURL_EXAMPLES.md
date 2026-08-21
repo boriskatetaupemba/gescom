@@ -109,3 +109,82 @@ curl -X GET \
   -H "DOLAPIENTITY: 1" \
   "https://YOUR-DOLIBARR/api/index.php/invoiceplus/warehouse/5"
 ```
+
+## Products priced for a customer
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/customer/42?limit=50&page=0"
+```
+
+## Products priced for a warehouse
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5?limit=50&page=0"
+```
+
+Example object, for a customer on level 3 whose level has no price and falls
+back to level 1:
+
+```json
+{
+  "id": "14292",
+  "ref": "05587",
+  "label": "Sample product",
+  "price": 50,
+  "price_ttc": 60,
+  "price_base_type": "HT",
+  "tva_tx": 20,
+  "requested_price_level": 3,
+  "applied_price_level": 1,
+  "price_level_source": "customer",
+  "price_fallback": true
+}
+```
+
+## Products, services or a category only
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5?mode=1&category=7"
+```
+
+## Pagination envelope, sorting and property filtering
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/customer/42?pagination_data=true&limit=20&page=2&sortfield=t.ref&sortorder=ASC"
+
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/customer/42?properties=id,ref,label,price,price_ttc,price_base_type,tva_tx,requested_price_level,applied_price_level,price_level_source,price_fallback"
+```
+
+## Universal Search filter and stock data
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  --data-urlencode "sqlfilters=(t.tosell:=:1) and (t.ref:like:'PR%')" -G \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5"
+
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5?includestockdata=1"
+```
+
+## Products without any applicable price
+
+The default refuses the page and names the product:
+
+```bash
+curl -i -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5"
+# HTTP/1.1 422 Unprocessable Entity
+# {"error":{"code":422,"message":"No applicable price for product 4074 (4682): level 1 has no defined price."}}
+```
+
+Omitting them is an explicit caller decision:
+
+```bash
+curl -X GET -H "DOLAPIKEY: YOUR_API_KEY" \
+  "https://YOUR-DOLIBARR/api/index.php/invoiceplus/products/warehouse/5?on_missing_price=skip"
+```

@@ -40,7 +40,7 @@ class modInvoicePlus extends DolibarrModules
 		$this->descriptionlong = 'ModuleInvoicePlusDescLong';
 		$this->editor_name = 'InvoicePlus';
 		$this->editor_url = '';
-		$this->version = '1.3.4';
+		$this->version = '1.4.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'bill';
 
@@ -56,7 +56,7 @@ class modInvoicePlus extends DolibarrModules
 			'theme' => 0,
 			'css' => array(),
 			'js' => array(),
-			'hooks' => array('invoicecard'),
+			'hooks' => array('invoicecard', 'productcard', 'warehousecard'),
 			'moduleforexternal' => 0,
 		);
 
@@ -94,7 +94,7 @@ class modInvoicePlus extends DolibarrModules
 	}
 
 	/**
-	 * Enable module and create/upgrade its idempotency table.
+	 * Enable module, create/upgrade its idempotency table and its extrafields.
 	 *
 	 * @param string $options Activation options
 	 * @return int            Result
@@ -105,8 +105,144 @@ class modInvoicePlus extends DolibarrModules
 		if ($result <= 0 || !$this->verifyCashSettlementSchema()) {
 			return -1;
 		}
+		if (!$this->installWarehousePriceLevelExtraField()) {
+			return -1;
+		}
 
 		return $this->_init(array(), $options);
+	}
+
+	/**
+	 * Create or refresh the nullable warehouse price-level extrafield.
+	 *
+	 * The value lives in the native entrepot_extrafields table; the module owns
+	 * no SQL table for it. The operation is idempotent, is scoped to the current
+	 * entity, works on a simple re-activation and never deletes stored values.
+	 *
+	 * @return bool True when the definition is installed and compatible
+	 */
+	private function installWarehousePriceLevelExtraField()
+	{
+		global $conf, $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		dol_include_once('/invoiceplus/class/invoicepluspricelevelservice.class.php');
+
+		$attributeName = InvoicePlusPriceLevelService::WAREHOUSE_LEVEL_FIELD;
+		$elementType = 'entrepot';
+		$entity = (int) $conf->entity;
+
+		$definitions = $this->readExtraFieldDefinitions($elementType, $attributeName);
+		if ($definitions === null) {
+			$this->error = 'InvoicePlus could not read the existing extrafield definitions of '.$elementType.'.';
+			dol_syslog(__METHOD__.' '.$this->error, LOG_ERR);
+			return false;
+		}
+
+		$targetEntity = $entity;
+		$hasReusableDefinition = false;
+		foreach ($definitions as $definition) {
+			if (!$this->isCompatibleWarehousePriceLevelDefinition($definition)) {
+				$this->error = 'InvoicePlus cannot install "'.$attributeName.'" on '.$elementType
+					.': an incompatible extrafield with the same name already exists (entity '
+					.((int) $definition->entity).', type '.$definition->type.').';
+				dol_syslog(__METHOD__.' '.$this->error, LOG_ERR);
+				return false;
+			}
+			if ((int) $definition->entity === 0) {
+				// A definition shared by every entity keeps its own scope.
+				$targetEntity = 0;
+				$hasReusableDefinition = true;
+			} elseif ((int) $definition->entity === $entity) {
+				$hasReusableDefinition = true;
+			}
+		}
+
+		if (is_object($langs)) {
+			$langs->load('invoiceplus@invoiceplus');
+		}
+		$extrafields = new ExtraFields($this->db);
+		// The list of levels is never frozen here: the label stays a plain
+		// integer field and the warehouse card rebuilds the choices per request.
+		$enabledCondition = 'getDolGlobalString("PRODUIT_MULTIPRICES") && getDolGlobalInt("PRODUIT_MULTIPRICES_LIMIT") > 0';
+		$arguments = array(
+			$attributeName,
+			'InvoicePlusWarehousePriceLevel',
+			'int',
+			500,
+			'5',
+			$elementType,
+			0,
+			0,
+			'',
+			// An empty array reaches strlen() in ExtraFields::create_label() and
+			// raises a PHP 8 TypeError, so "no parameter" is the empty string.
+			'',
+			0,
+			'',
+			'1',
+			'InvoicePlusWarehousePriceLevelHelp',
+			'',
+			$targetEntity,
+			'invoiceplus@invoiceplus',
+			$enabledCondition,
+			0,
+			0,
+		);
+
+		$result = $hasReusableDefinition
+			? call_user_func_array(array($extrafields, 'updateExtraField'), $arguments)
+			: call_user_func_array(array($extrafields, 'addExtraField'), $arguments);
+		if ($result <= 0) {
+			$this->error = 'InvoicePlus could not install the warehouse price-level extrafield: '
+				.($extrafields->error !== '' ? $extrafields->error : 'unknown error').'.';
+			dol_syslog(__METHOD__.' '.$this->error, LOG_ERR);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Read every stored definition of one extrafield, all entities included.
+	 *
+	 * @param string $elementType   Native element type
+	 * @param string $attributeName Extrafield name
+	 * @return array|null            Definitions, or null on SQL error
+	 */
+	private function readExtraFieldDefinitions($elementType, $attributeName)
+	{
+		$sql = 'SELECT rowid, entity, type, size, fieldrequired, fieldunique, fieldcomputed';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'extrafields';
+		$sql .= " WHERE elementtype = '".$this->db->escape($elementType)."'";
+		$sql .= " AND name = '".$this->db->escape($attributeName)."'";
+
+		$result = $this->db->query($sql);
+		if (!$result) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return null;
+		}
+		$definitions = array();
+		while ($row = $this->db->fetch_object($result)) {
+			$definitions[] = $row;
+		}
+		$this->db->free($result);
+
+		return $definitions;
+	}
+
+	/**
+	 * Test whether an existing definition can host the warehouse price level.
+	 *
+	 * @param object $definition Stored extrafield definition
+	 * @return bool               True when the definition is compatible
+	 */
+	private function isCompatibleWarehousePriceLevelDefinition($definition)
+	{
+		return $definition->type === 'int'
+			&& empty($definition->fieldrequired)
+			&& empty($definition->fieldunique)
+			&& (string) $definition->fieldcomputed === '';
 	}
 
 	/**
@@ -179,6 +315,10 @@ class modInvoicePlus extends DolibarrModules
 
 	/**
 	 * Disable module while preserving configuration values.
+	 *
+	 * Neither the settlement journal nor the warehouse price-level extrafield
+	 * and its stored values are removed, so a deactivation followed by a
+	 * re-activation keeps every record.
 	 *
 	 * @param string $options Removal options
 	 * @return int            Result

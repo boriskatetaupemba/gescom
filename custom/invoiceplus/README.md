@@ -1,4 +1,4 @@
-# InvoicePlus 1.3.4
+# InvoicePlus 1.4.0
 
 InvoicePlus is an extensible Dolibarr module for customer-invoice services. It now owns every invoice API customization that previously lived in Dolibarr core:
 
@@ -10,6 +10,8 @@ GET /api/index.php/invoiceplus/ref_ext/{ref_ext}
 GET /api/index.php/invoiceplus/byaccounts?account_ids=1,2,3
 GET /api/index.php/invoiceplus/warehouse/{warehouse_id}
 GET /api/index.php/invoiceplus/thirdparties
+GET /api/index.php/invoiceplus/products/customer/{customer_id}
+GET /api/index.php/invoiceplus/products/warehouse/{warehouse_id}
 POST /api/index.php/invoiceplus/invoices/{invoice_id}/cash-settlement
 GET /api/index.php/invoiceplus/cash-settlements/{operation_id}
 ```
@@ -37,9 +39,10 @@ The complete audit is in [docs/AUDIT.md](docs/AUDIT.md).
 1. Back up the Dolibarr database and custom modules directory.
 2. Extract `invoiceplus.zip` so the resulting path is `htdocs/custom/invoiceplus/`.
 3. Check that the web-server user can read the extracted files.
-4. In **Home > Setup > Modules/Applications**, enable REST API, Customer Invoices, Stocks, Banks/Cash and Multi-currency, then Invoice Plus. Re-enable Invoice Plus after upgrading so its 1.3.0 table is installed.
+4. In **Home > Setup > Modules/Applications**, enable REST API, Customer Invoices, Stocks, Banks/Cash and Multi-currency, then Invoice Plus. Re-enable Invoice Plus after upgrading so its 1.3.0 table is installed, so the 1.4.0 `productcard`/`warehousecard` hook contexts are registered, and so the `invoiceplus_price_level` extrafield is created or refreshed. Re-activation never deletes stored data.
 5. Open Invoice Plus setup and review the five constants.
 6. If `API_PRODUCTION_MODE` is enabled, clear Dolibarr's REST/Restler cache or disable and re-enable the REST API module so the explorer is regenerated.
+7. For the price-level features, check that `PRODUIT_MULTIPRICES` is enabled and that `PRODUIT_MULTIPRICES_LIMIT` is strictly positive. Otherwise the new interfaces stay hidden and the two product routes answer HTTP 409.
 
 The archive contains a top-level `invoiceplus/` directory and is directly suitable for extraction under `htdocs/custom/`.
 
@@ -191,6 +194,46 @@ overpay the protected invoice.
 
 All InvoicePlus list routes cap `limit` with `INVOICEPLUS_MAX_API_LIMIT`; a zero or negative value uses that configured maximum instead of producing an unbounded response.
 
+## Price levels
+
+Version 1.4.0 completes Dolibarr's native multi-level prices without creating a
+second price grid. Customers and warehouses both use the native
+`product_price.price_level` data; the only new data is the level number of a
+warehouse, stored in the native `entrepot_extrafields` table.
+
+- The product creation form gains the N dynamic level rows the native form
+  hides, reusing the native `price`, `price_base_type`, `price_{N}` and
+  `multiprices_base_type_{N}` field names. Edition stays on the native
+  **Prices** tab.
+- A warehouse can receive a nullable commercial level between 1 and N.
+- Resolution order is **Customer > Warehouse > level 1**, and a selected level
+  with no price falls back **directly** to level 1 — never to an intermediate
+  level, never back to the warehouse level after a customer level.
+- A price of `0` is a defined price and never triggers the fallback.
+
+```text
+GET /api/index.php/invoiceplus/products/customer/{customer_id}
+GET /api/index.php/invoiceplus/products/warehouse/{warehouse_id}
+```
+
+Both return the native product representation with the commercial fields of the
+applied price line, plus `requested_price_level`, `applied_price_level`,
+`price_level_source` (`customer`, `warehouse` or `default_level`) and
+`price_fallback`. Prices for a whole page are read by one grouped query.
+
+`on_missing_price` controls what happens when a product has no price at the
+requested level and none at level 1. The default `error` refuses the page with
+HTTP 422 and names the product; `skip` is an explicit caller decision that
+omits those products and logs them. With `skip`, the `pagination.total` counts
+the selected products, so it can exceed the number of returned rows.
+
+InvoicePlus has **no** invoice-creation POST, and the native `POST /invoices`
+preserves an explicitly supplied `lines[].subprice`, `0` included; an absent or
+`null` `subprice` does not trigger the InvoicePlus resolution in this version.
+
+Full contract, algorithm, native level-1 limitation and upgrade procedure:
+[docs/PRICE_LEVELS.md](docs/PRICE_LEVELS.md).
+
 ## Warehouse endpoint parameters
 
 | Parameter | Default | Notes |
@@ -245,17 +288,18 @@ After activation, visit:
 https://YOUR-DOLIBARR/api/index.php/explorer/
 ```
 
-Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, and `GET /thirdparties`. If they are absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
+Find the `invoiceplus` API and verify the root list, `GET /byaccounts`, `GET /warehouse/{warehouse_id}`, `GET /thirdparties`, `GET /products/customer/{customer_id}`, and `GET /products/warehouse/{warehouse_id}`. If they are absent while production mode is active, clear the API cache or re-enable the API module. No core routing edit is required: Dolibarr 20.0.4 maps `invoiceplus` to `custom/invoiceplus/class/api_invoiceplus.class.php` and class `Invoiceplus`.
 
 ## Tests
 
-- Unit tests: run `phpunit test/unit/InvoicePlusInvoiceServiceTest.php`, `phpunit test/unit/InvoicePlusCashSettlementServiceTest.php`, and `phpunit test/unit/InvoicePlusTriggersTest.php` from the module directory with a PHPUnit release compatible with the installed PHP version. The legacy PEAR PHPUnit bundled with some XAMPP releases is not supported on PHP 8.
+- Unit tests: run `phpunit test/unit/InvoicePlusInvoiceServiceTest.php`, `phpunit test/unit/InvoicePlusCashSettlementServiceTest.php`, `phpunit test/unit/InvoicePlusTriggersTest.php`, `phpunit test/unit/InvoicePlusPriceLevelServiceTest.php`, and `phpunit test/unit/InvoicePlusPriceLevelFormsTest.php` from the module directory with a PHPUnit release compatible with the installed PHP version. The legacy PEAR PHPUnit bundled with some XAMPP releases is not supported on PHP 8.
 - PowerShell API suite: `test/api/test_invoiceplus_api.ps1`.
 - POSIX API suite: `test/api/test_invoiceplus_api.sh` (requires `curl` and `jq`).
 - Manual acceptance matrix: [test/MANUAL_TESTS.md](test/MANUAL_TESTS.md).
 
 Pass `InvoiceId`/`INVOICE_ID` for a record belonging to the tested warehouse. The scripts compare the canonical native `/invoices/{id}` payload with InvoicePlus using `loadlinkedobjects=true`, excluding the module-owned `invoiceclosure` and `invoiceplus_warehouse_filter` fields from the structural comparison.
 Pass `AccountIds`/`ACCOUNT_IDS` as a comma-separated list to exercise the `/byaccounts` route as well.
+Pass `CustomerId`/`CUSTOMER_ID` to exercise the customer product route. Set `-PriceLevelsEnabled $false`/`PRICE_LEVELS_ENABLED=0` on an installation where `PRODUIT_MULTIPRICES` is off to assert the HTTP 409 answers instead.
 
 ## Performance and limitations
 
@@ -265,6 +309,9 @@ Pass `AccountIds`/`ACCOUNT_IDS` as a comma-separated list to exercise the `/byac
 - On the warehouse endpoint, `closed` and `paid_not_closed` use InvoiceClosure's indexed status table in the selection query, so filtering, counting and pagination stay bounded by the database query rather than an application-side scan.
 - `pagination_data`, date filtering, `withLines`, `warehouse_lines_only`, and the maximum page cap are InvoicePlus extensions because the installed 20.0.4 native `Invoices::index()` does not expose them.
 - Live HTTP and database integration tests require the deployed Dolibarr database and API authentication; they cannot be truthfully completed against a source-only checkout.
+- The two product routes load each product with `Product::fetch(..., $ignore_price_load = 1)` to avoid `PRODUIT_MULTIPRICES_LIMIT` queries per product. Their `multiprices*` arrays are therefore empty; the applicable price is exposed in `price`, `price_ttc`, `price_base_type` and `tva_tx`.
+- Writing levels 2 to N at creation leaves the `product` table's own price columns holding the last written level, exactly as the native Prices tab does. The authoritative per-level data stays in `product_price`.
+- Dolibarr 20.0.4 `Product::create()` always writes a level-1 history line and normalizes an empty level-1 price to zero, so an empty level 1 is indistinguishable from an explicit zero. Levels 2 to N do preserve the difference.
 
 ## Adding future endpoints
 
